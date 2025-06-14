@@ -5,7 +5,7 @@ from typing import Union
 
 # Import the base class and the unified result
 from .base_extractor import BaseExtractor, ExtractionResult
-
+from ..utils.text_quality import TextQualityAnalyzer
 
 class PDFTextExtractor(BaseExtractor):
     """Extracts the full text from a PDF file, with special rules for long files."""
@@ -15,6 +15,7 @@ class PDFTextExtractor(BaseExtractor):
         # Constant to define the page limit
         self.PAGE_LIMIT_FOR_SAMPLING = 10
         self.PAGES_TO_SAMPLE = 5
+        self.quality_analyzer = TextQualityAnalyzer()
 
     def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
         """
@@ -61,6 +62,14 @@ class PDFTextExtractor(BaseExtractor):
 
             # Joins all collected text into a single string
             full_content = "\n\n".join(filter(None, page_texts))
+
+            quality_report = self.quality_analyzer.analyze_quality(full_content)
+
+            if quality_report['is_poor_quality']:
+                self.logger.warning(
+                    f"⚠️  Poor extraction quality for '{source_filename}': {quality_report['reason']}. "
+                    f"Recommendations: {', '.join(quality_report['recommendations'])}"
+                )
 
             doc.close()
             self.logger.info(f"Extraction from '{source_filename}' completed successfully.")
