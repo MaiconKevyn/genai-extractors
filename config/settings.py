@@ -13,7 +13,7 @@ class ExtractorConfig:
 
     def __post_init__(self):
         if self.supported_extensions is None:
-            self.supported_extensions = ['.pdf']
+            self.supported_extensions = ['.pdf', '.docx', '.xlsx', '.csv']
 
 
 # Global configuration
@@ -28,13 +28,3 @@ OUTPUT_DIR = DATA_DIR / "output"
 # Create directories if they don't exist
 INPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-# Debug: print paths for verification
-if __name__ == "__main__":
-    print(f"PROJECT_ROOT: {PROJECT_ROOT}")
-    print(f"INPUT_DIR: {INPUT_DIR}")
-    print(f"OUTPUT_DIR: {OUTPUT_DIR}")
-    print(f"INPUT_DIR exists: {INPUT_DIR.exists()}")
-    print(f"Default output format: {EXTRACTOR_CONFIG.output_format}")
-    print(f"Include metadata: {EXTRACTOR_CONFIG.include_metadata}")
-    print(f"Supported extensions: {EXTRACTOR_CONFIG.supported_extensions}")
