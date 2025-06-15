@@ -36,18 +36,16 @@ class QualityConfig:
 
 @dataclass
 class OCRConfig:
-    """Configuration for OCR processing with Tesseract"""
-    # Tesseract configuration
+    """Configuration for OCR processing with EasyOCR"""
+    # EasyOCR configuration
     enabled: bool = True
-    tesseract_cmd: str = "tesseract"  # Path para tesseract executable
-    language: str = "eng+por"  # Idiomas: inglês + português
-    psm_mode: int = 6  # Page Segmentation Mode (6 = uniform block of text)
-    oem_mode: int = 3  # OCR Engine Mode (3 = default, based on what is available)
+    languages: List[str] = None  # ['en', 'pt'] por padrão
+    use_gpu: bool = False  # GPU disabled por padrão para compatibilidade
+    confidence_threshold: float = 0.5  # Confiança mínima para aceitar texto
 
     # Image preprocessing
     dpi_scale: float = 2.0  # Multiplicador de DPI (2x = melhor qualidade)
-    contrast_enhance: bool = True
-    noise_removal: bool = True
+    enhance_image: bool = True  # Aplica melhorias na imagem antes do OCR
 
     # Performance
     max_pages_for_ocr: int = 20  # Máximo de páginas para fazer OCR
@@ -55,10 +53,11 @@ class OCRConfig:
 
     # Fallback behavior
     use_ocr_fallback: bool = True  # Se ativa OCR automaticamente
-    save_preprocessed_images: bool = False  # Para debug, salva imagens processadas
+    save_debug_images: bool = False  # Para debug, salva imagens processadas
 
-    # Custom tesseract options
-    custom_config: str = "--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ.,!?;:()\"\'-"
+    def __post_init__(self):
+        if self.languages is None:
+            self.languages = ['en', 'pt']  # Inglês + Português
 
 
 # Global configurations
@@ -72,7 +71,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 INPUT_DIR = DATA_DIR / "input"
 OUTPUT_DIR = DATA_DIR / "output"
 
-# 🆕 OCR specific paths
+# OCR specific paths
 OCR_DEBUG_DIR = DATA_DIR / "ocr_debug"  # Para salvar imagens de debug
 TEMP_DIR = DATA_DIR / "temp"  # Para arquivos temporários
 
@@ -100,42 +99,33 @@ def get_quality_config() -> Dict[str, Any]:
 
 def validate_ocr_dependencies() -> Dict[str, bool]:
     """
-    Valida se as dependências OCR estão disponíveis.
+    Valida se as dependências OCR estão disponíveis (EasyOCR).
 
     Returns:
         Dict com status de cada dependência
     """
-    import subprocess
     import importlib
 
     status = {
-        'tesseract_installed': False,
-        'pytesseract_available': False,
-        'pillow_available': False,
-        'opencv_available': False
+        'easyocr_installed': False,
+        'pymupdf_available': False,
+        'opencv_available': False,
+        'torch_available': False  # EasyOCR precisa do PyTorch
     }
 
-    # Verifica Tesseract
+    # Verifica EasyOCR
     try:
-        result = subprocess.run([OCR_CONFIG.tesseract_cmd, '--version'],
-                                capture_output=True, text=True, timeout=5)
-        status['tesseract_installed'] = result.returncode == 0
-    except (subprocess.SubprocessError, FileNotFoundError):
-        status['tesseract_installed'] = False
-
-    # Verifica pytesseract
-    try:
-        importlib.import_module('pytesseract')
-        status['pytesseract_available'] = True
+        importlib.import_module('easyocr')
+        status['easyocr_installed'] = True
     except ImportError:
-        status['pytesseract_available'] = False
+        status['easyocr_installed'] = False
 
-    # Verifica Pillow
+    # Verifica PyMuPDF (para conversão PDF->imagem)
     try:
-        importlib.import_module('PIL')
-        status['pillow_available'] = True
+        importlib.import_module('fitz')
+        status['pymupdf_available'] = True
     except ImportError:
-        status['pillow_available'] = False
+        status['pymupdf_available'] = False
 
     # Verifica OpenCV (opcional para preprocessing)
     try:
@@ -144,10 +134,17 @@ def validate_ocr_dependencies() -> Dict[str, bool]:
     except ImportError:
         status['opencv_available'] = False
 
+    # Verifica PyTorch (necessário para EasyOCR)
+    try:
+        importlib.import_module('torch')
+        status['torch_available'] = True
+    except ImportError:
+        status['torch_available'] = False
+
     return status
 
 
-# 🆕 Configurações específicas por tipo de documento
+# Configurações específicas por tipo de documento (mantidas)
 DOCUMENT_TYPE_CONFIGS = {
     'academic_papers': QualityConfig(
         min_text_length=200,
@@ -182,21 +179,20 @@ def get_config_for_document_type(doc_type: str) -> QualityConfig:
     return DOCUMENT_TYPE_CONFIGS.get(doc_type, QUALITY_CONFIG)
 
 
-# 🆕 Função para setup inicial
 def setup_ocr_environment():
     """
-    Configura ambiente OCR e valida dependências.
+    Configura ambiente OCR e valida dependências EasyOCR.
     Deve ser chamada na inicialização da aplicação.
     """
     import logging
     logger = logging.getLogger(__name__)
 
-    logger.info("🔧 Setting up OCR environment...")
+    logger.info("🔧 Setting up EasyOCR environment...")
 
     # Valida dependências
     deps = validate_ocr_dependencies()
 
-    logger.info(f"📋 OCR Dependencies Status:")
+    logger.info(f"📋 EasyOCR Dependencies Status:")
     for dep, status in deps.items():
         status_icon = "✅" if status else "❌"
         logger.info(f"   {status_icon} {dep}: {status}")
@@ -206,33 +202,37 @@ def setup_ocr_environment():
 
     if missing_deps:
         logger.warning(f"⚠️  Missing OCR dependencies: {', '.join(missing_deps)}")
-        logger.warning("📥 Install with: pip install pytesseract pillow")
+        logger.warning("📥 Install with: pip install easyocr torch")
 
-        if not deps['tesseract_installed']:
-            logger.warning("📥 Install Tesseract from: https://github.com/tesseract-ocr/tesseract")
+        if not deps['easyocr_installed']:
+            logger.warning("📥 Install EasyOCR: pip install easyocr")
+        if not deps['torch_available']:
+            logger.warning("📥 Install PyTorch: pip install torch")
 
     # Ajusta configuração se OCR não estiver disponível
-    if not all([deps['tesseract_installed'], deps['pytesseract_available']]):
+    critical_deps = ['easyocr_installed', 'pymupdf_available', 'torch_available']
+    if not all(deps[dep] for dep in critical_deps):
         global OCR_CONFIG
         OCR_CONFIG.enabled = False
-        logger.warning("🚫 OCR disabled due to missing dependencies")
+        logger.warning("🚫 OCR disabled due to missing critical dependencies")
     else:
-        logger.info("✅ OCR environment ready!")
+        logger.info("✅ EasyOCR environment ready!")
 
     return deps
 
 
 if __name__ == "__main__":
     # Teste das configurações
-    print("🧪 Testing OCR configuration...")
+    print("🧪 Testing EasyOCR configuration...")
 
     deps = setup_ocr_environment()
     print(f"\n📊 Dependencies: {deps}")
 
     print(f"\n⚙️  OCR Config:")
     print(f"   Enabled: {OCR_CONFIG.enabled}")
-    print(f"   Language: {OCR_CONFIG.language}")
-    print(f"   DPI Scale: {OCR_CONFIG.dpi_scale}")
+    print(f"   Languages: {OCR_CONFIG.languages}")
+    print(f"   Use GPU: {OCR_CONFIG.use_gpu}")
+    print(f"   Confidence Threshold: {OCR_CONFIG.confidence_threshold}")
 
     print(f"\n⚙️  Quality Config:")
     quality_dict = get_quality_config()
