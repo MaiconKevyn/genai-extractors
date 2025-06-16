@@ -19,8 +19,8 @@ class PDFTextExtractor(BaseExtractor):
         self.PAGE_LIMIT_FOR_SAMPLING = 10
         self.PAGES_TO_SAMPLE = 5
         self.OCR_MAX_PAGES = 20
-        self.OCR_LANGUAGES = ['en', 'pt']
-        self.OCR_USE_GPU = False
+        self.OCR_LANGUAGES = 'eng+por'  # Tesseract format: eng+por
+        self.OCR_CONFIG = '--psm 3'  # Page Segmentation Mode
 
         # Componentes inicializados sob demanda
         self.ocr_processor = None
@@ -123,11 +123,12 @@ class PDFTextExtractor(BaseExtractor):
             return not text or len(text.strip()) < 50
 
     def _apply_ocr_extraction(self, pdf_path: Path, source_filename: str) -> str:
-        """Aplica OCR para extrair texto do PDF."""
+        """Aplica OCR para extrair texto do PDF usando Tesseract."""
         try:
             ocr_processor = self._get_ocr_processor()
             if not ocr_processor or not ocr_processor.is_available():
-                self.logger.warning(f"OCR não disponível para '{source_filename}'. Instale com: pip install easyocr")
+                self.logger.warning(
+                    f"Tesseract OCR não disponível para '{source_filename}'. Instale com: pip install pytesseract")
                 return ""
 
             # Verifica limite de páginas para OCR
@@ -145,26 +146,26 @@ class PDFTextExtractor(BaseExtractor):
             ocr_text = ocr_processor.extract_text_from_pdf(pdf_path, max_pages=self.OCR_MAX_PAGES)
 
             if ocr_text.strip():
-                self.logger.info(f"OCR extraiu {len(ocr_text)} caracteres de '{source_filename}'")
+                self.logger.info(f"Tesseract OCR extraiu {len(ocr_text)} caracteres de '{source_filename}'")
                 return ocr_text
             else:
-                self.logger.warning(f"OCR retornou texto vazio para '{source_filename}'")
+                self.logger.warning(f"Tesseract OCR retornou texto vazio para '{source_filename}'")
                 return ""
 
         except Exception as e:
-            self.logger.error(f"OCR falhou para '{source_filename}': {e}")
+            self.logger.error(f"Tesseract OCR falhou para '{source_filename}': {e}")
             return ""
 
     def _get_ocr_processor(self):
-        """Inicialização lazy do processador OCR."""
+        """Inicialização lazy do processador OCR com Tesseract."""
         if self.ocr_processor is None:
             try:
-                from ..utils.ocr_processor import EasyOCRProcessor
-                self.ocr_processor = EasyOCRProcessor(
+                from ..utils.pytesseract_processor import PytesseractProcessor
+                self.ocr_processor = PytesseractProcessor(
                     languages=self.OCR_LANGUAGES,
-                    gpu=self.OCR_USE_GPU
+                    config=self.OCR_CONFIG
                 )
             except ImportError:
-                self.logger.warning("EasyOCRProcessor não disponível. Instale com: pip install easyocr")
+                self.logger.warning("PytesseractProcessor não disponível. Instale com: pip install pytesseract")
                 self.ocr_processor = None
         return self.ocr_processor

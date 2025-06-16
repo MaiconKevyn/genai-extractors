@@ -2,6 +2,7 @@
 """
 Pipeline runner simplificado - sem Factory Pattern.
 Sistema plug-and-play que funciona sem configurações obrigatórias.
+Versão melhorada com verificação de OCR e instruções claras.
 """
 
 import sys
@@ -45,10 +46,123 @@ def get_directories():
         return input_dir, output_dir
 
 
+def check_ocr_dependencies():
+    """
+    Verifica se OCR está disponível e informa ao usuário.
+
+    Returns:
+        bool: True se OCR estiver disponível, False caso contrário
+    """
+    try:
+        from src.utils.pytesseract_processor import validate_tesseract_dependencies
+
+        deps = validate_tesseract_dependencies()
+
+        ocr_available = (
+                deps.get('pytesseract_available', False) and
+                deps.get('tesseract_executable', False) and
+                deps.get('pillow_available', False)
+        )
+
+        if ocr_available:
+            logging.info("✅ OCR (Tesseract) está disponível e funcionando")
+            try:
+                import pytesseract
+                version = pytesseract.get_tesseract_version()
+                logging.info(f"📋 Tesseract versão: {version}")
+            except:
+                pass
+        else:
+            logging.warning("⚠️  OCR (Tesseract) NÃO está disponível")
+            logging.warning("📄 Documentos com texto de baixa qualidade não serão melhorados com OCR")
+
+            # Instruções específicas por dependência faltante
+            if not deps.get('pytesseract_available', False):
+                logging.warning("   • Instale pytesseract: pip install pytesseract")
+
+            if not deps.get('tesseract_executable', False):
+                logging.warning("   • Instale Tesseract executável:")
+                logging.warning("     - Ubuntu: sudo apt install tesseract-ocr tesseract-ocr-eng tesseract-ocr-por")
+                logging.warning("     - macOS: brew install tesseract")
+                logging.warning("     - Windows: baixe de https://github.com/UB-Mannheim/tesseract/wiki")
+
+            if not deps.get('pillow_available', False):
+                logging.warning("   • Instale Pillow: pip install Pillow")
+
+        return ocr_available
+
+    except ImportError:
+        logging.warning("⚠️  Módulo de OCR não encontrado")
+        return False
+
+
+def analyze_extracted_content(output_dir):
+    """
+    Analisa o conteúdo extraído e identifica quais documentos se beneficiariam de OCR.
+
+    Args:
+        output_dir: Diretório com arquivos JSON extraídos
+    """
+    try:
+        from src.utils.text_quality import needs_ocr
+        import json
+
+        json_files = list(output_dir.glob("*.json"))
+
+        if not json_files:
+            return
+
+        logging.info(f"\n📊 Análise de qualidade do texto extraído:")
+
+        ocr_recommended = []
+        good_quality = []
+
+        for json_file in json_files:
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                content = data.get('content', '')
+                if needs_ocr(content):
+                    ocr_recommended.append(json_file.stem)
+                else:
+                    good_quality.append(json_file.stem)
+
+            except Exception as e:
+                logging.warning(f"   Erro ao analisar {json_file.name}: {e}")
+
+        if good_quality:
+            logging.info(f"   ✅ Boa qualidade ({len(good_quality)} arquivos):")
+            for filename in good_quality[:3]:  # Mostrar apenas primeiros 3
+                logging.info(f"      • {filename}")
+            if len(good_quality) > 3:
+                logging.info(f"      • ... e mais {len(good_quality) - 3} arquivos")
+
+        if ocr_recommended:
+            logging.info(f"   📋 Recomendado OCR ({len(ocr_recommended)} arquivos):")
+            for filename in ocr_recommended[:3]:  # Mostrar apenas primeiros 3
+                logging.info(f"      • {filename}")
+            if len(ocr_recommended) > 3:
+                logging.info(f"      • ... e mais {len(ocr_recommended) - 3} arquivos")
+
+            logging.info(f"\n💡 Para melhorar estes {len(ocr_recommended)} arquivos:")
+            logging.info(f"   1. Instale Tesseract OCR (veja instruções acima)")
+            logging.info(f"   2. Execute novamente: python pipelinerunner.py")
+            logging.info(f"   3. Os arquivos serão automaticamente melhorados com OCR")
+
+    except ImportError:
+        logging.debug("Módulo de análise de qualidade não disponível")
+
+
 def main():
     """Função principal do pipeline."""
 
     logging.info("🚀 Iniciando Pipeline de Extração de Documentos")
+    logging.info("=" * 60)
+
+    # ✅ Verificar OCR primeiro (informa ao usuário sobre capacidades)
+    ocr_available = check_ocr_dependencies()
+
     logging.info("=" * 60)
 
     # ✅ Obter diretórios (configurado ou padrão)
@@ -105,6 +219,10 @@ def main():
         logging.info(f"💡 Extensões aceitas: {', '.join(supported_extensions)}")
         return True
 
+    # ✅ Aviso sobre OCR se não estiver disponível
+    if not ocr_available:
+        logging.info(f"\n⚠️  OCR não está disponível - documentos escaneados podem ter qualidade reduzida")
+
     logging.info(f"\n🔄 Iniciando processamento de {len(supported_files)} arquivos...")
     logging.info("=" * 60)
 
@@ -112,7 +230,8 @@ def main():
     results = {
         'success': [],
         'failed': [],
-        'total_time': 0
+        'total_time': 0,
+        'ocr_improved': 0
     }
 
     import time
@@ -166,12 +285,23 @@ def main():
         for filename in results['failed']:
             logging.info(f"      • {filename}")
 
+    # ✅ Análise de qualidade do conteúdo extraído
+    if results['success']:
+        analyze_extracted_content(output_dir)
+
     # ✅ Dicas para melhorar resultados
-    if results['failed']:
-        logging.info(f"\n💡 Dicas para resolver falhas:")
-        logging.info(f"   • Verifique se arquivos não estão corrompidos")
-        logging.info(f"   • Para PDFs escaneados, instale: pip install easyocr")
-        logging.info(f"   • Verifique logs detalhados acima para erros específicos")
+    if results['failed'] or not ocr_available:
+        logging.info(f"\n💡 Dicas para melhorar resultados:")
+
+        if results['failed']:
+            logging.info(f"   • Verifique se arquivos não estão corrompidos")
+            logging.info(f"   • Verifique logs detalhados acima para erros específicos")
+
+        if not ocr_available:
+            logging.info(f"   • Para melhorar documentos escaneados, instale Tesseract OCR:")
+            logging.info(f"     - Ubuntu: sudo apt install tesseract-ocr tesseract-ocr-eng tesseract-ocr-por")
+            logging.info(f"     - Python: pip install pytesseract")
+            logging.info(f"   • Após instalar OCR, execute novamente para melhorar qualidade")
 
     return len(results['success']) > 0
 
