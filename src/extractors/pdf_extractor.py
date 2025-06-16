@@ -29,7 +29,7 @@ class PDFTextExtractor(BaseExtractor):
             class DefaultOCRConfig:
                 max_pages_for_ocr = 20
                 enabled = True
-                languages = ['en', 'pt']
+                languages = ['en']
                 use_gpu = False
 
             self.ocr_config = DefaultOCRConfig()

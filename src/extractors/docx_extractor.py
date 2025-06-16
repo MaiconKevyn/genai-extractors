@@ -29,7 +29,7 @@ class DocxExtractor(BaseExtractor):
 
             class DefaultOCRConfig:
                 enabled = True
-                languages = ['en', 'pt']
+                languages = ['en']
                 use_gpu = False
 
             self.ocr_config = DefaultOCRConfig()
