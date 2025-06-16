@@ -1,86 +1,96 @@
-import docx  # Imports the python-docx library
-import logging
-from pathlib import Path
-from typing import Union
+# src/extractors/docx_extractor.py
+"""
+DocxExtractor simplificado.
+Remove configurações complexas, mantém funcionalidade de OCR e sampling.
+"""
+
+import docx  # python-docx library
 import zipfile
 import tempfile
 import os
+from pathlib import Path
+from typing import Union
 from PIL import Image
 from io import BytesIO
 
-# Imports the base class and unified result
 from .base_extractor import BaseExtractor, ExtractionResult
-from ..utils.text_quality import TextQualityAnalyzer
-from ..utils.ocr_processor import EasyOCRProcessor
 
 
 class DocxExtractor(BaseExtractor):
-    """Extracts text from .docx, with sampling for large files and OCR for images when needed."""
+    """
+    Extrai texto de arquivos .docx com sampling para arquivos grandes e OCR para imagens.
+    Versão simplificada com configurações diretas.
+    """
 
     def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
+        super().__init__()
 
-        # Import OCR configuration (same pattern as PDF extractor)
-        try:
-            from config.settings import OCR_CONFIG
-            self.ocr_config = OCR_CONFIG
-        except ImportError:
-            self.logger.warning("OCR configuration not found, using defaults")
-
-            class DefaultOCRConfig:
-                enabled = True
-                languages = ['en']
-                use_gpu = False
-
-            self.ocr_config = DefaultOCRConfig()
-
-        # Constants for sampling logic
+        # Configurações de sampling (valores diretos)
         self.PARAGRAPH_LIMIT_FOR_SAMPLING = 180
         self.PARAGRAPHS_TO_SAMPLE = 90
 
-        # OCR components (same as PDF extractor)
-        self.quality_analyzer = TextQualityAnalyzer()
-        self.ocr_processor = None  # Lazy loading
+        # Configurações de OCR (valores diretos)
+        self.OCR_ENABLED = True
+        self.OCR_LANGUAGES = ['en', 'pt']
+        self.OCR_USE_GPU = False
 
-    def _get_ocr_processor(self) -> EasyOCRProcessor:
-        """Lazy loading of the OCR processor with proper configuration."""
-        if self.ocr_processor is None:
-            self.ocr_processor = EasyOCRProcessor(
-                languages=self.ocr_config.languages,
-                gpu=self.ocr_config.use_gpu
-            )
-        return self.ocr_processor
+        # Componentes inicializados sob demanda
+        self.quality_analyzer = None
+        self.ocr_processor = None
 
     def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
         """
-        Extracts text from a .docx. Same pattern as PDF extractor:
-        1. Standard extraction, 2. Quality analysis, 3. OCR if needed
+        Extrai texto de DOCX seguindo mesmo padrão do PDF:
+        1. Extração padrão, 2. Análise de qualidade, 3. OCR se necessário
+
+        Args:
+            input_path: Caminho para o arquivo DOCX
+
+        Returns:
+            ExtractionResult com conteúdo extraído
         """
         docx_path = Path(input_path)
         source_filename = docx_path.name
 
+        # Validações básicas
         if not docx_path.exists():
-            return self._create_error_result(source_filename, f"File not found: {docx_path}")
+            return self._create_error_result(source_filename, f"Arquivo não encontrado: {docx_path}")
 
         if docx_path.suffix.lower() != '.docx':
-            return self._create_error_result(source_filename, f"File is not a .docx: {docx_path.suffix}")
+            return self._create_error_result(source_filename, f"Arquivo não é DOCX: {docx_path.suffix}")
 
         try:
-            # STEP 1: Standard text extraction (same as before)
+            # ETAPA 1: Extração padrão de texto
             extracted_text = self._extract_standard_text(docx_path, source_filename)
 
-            # STEP 2: Quality analysis (same as PDF)
-            quality_report = self.quality_analyzer.analyze_quality(extracted_text)
+            # ETAPA 2: Análise de qualidade e decisão de OCR
+            needs_ocr = False
 
-            # STEP 3: Decide whether to apply OCR (same logic as PDF)
-            if quality_report['needs_ocr'] and self.ocr_config.enabled:
-                ocr_text = self._apply_ocr_extraction(docx_path, source_filename)
-
-                if ocr_text and len(ocr_text.strip()) > len(extracted_text.strip()):
-                    self.logger.info(f"OCR improved text quality for '{source_filename}'")
-                    extracted_text = ocr_text
+            if self.OCR_ENABLED:
+                if not extracted_text.strip():
+                    # Se não há texto extraído, provavelmente é documento escaneado ou só com imagens
+                    self.logger.info(
+                        f"Pouco ou nenhum texto extraído de '{source_filename}'. Aplicando OCR automaticamente.")
+                    needs_ocr = True
                 else:
-                    self.logger.warning(f"OCR did not improve quality for '{source_filename}', keeping original")
+                    # Se há texto, analisa qualidade para decidir sobre OCR
+                    quality_analyzer = self._get_quality_analyzer()
+                    if quality_analyzer:
+                        quality_report = quality_analyzer.analyze_quality(extracted_text)
+                        needs_ocr = quality_report.get('needs_ocr', False)
+
+                        if needs_ocr:
+                            self.logger.info(f"Qualidade ruim detectada para '{source_filename}'. Aplicando OCR...")
+
+                # ETAPA 3: Aplicar OCR se necessário
+                if needs_ocr:
+                    ocr_text = self._apply_ocr_extraction(docx_path, source_filename)
+
+                    if ocr_text and len(ocr_text.strip()) > len(extracted_text.strip()):
+                        self.logger.info(f"OCR melhorou qualidade do texto para '{source_filename}'")
+                        extracted_text = ocr_text
+                    else:
+                        self.logger.warning(f"OCR não melhorou qualidade para '{source_filename}', mantendo original")
 
             return ExtractionResult(
                 source_file=source_filename,
@@ -92,42 +102,43 @@ class DocxExtractor(BaseExtractor):
             return self._create_error_result(source_filename, str(e))
 
     def _extract_standard_text(self, docx_path: Path, source_filename: str) -> str:
-        """Extracts text using standard method (same as before)."""
+        """Extrai texto usando método padrão (python-docx)."""
         document = docx.Document(str(docx_path))
         paragraphs = document.paragraphs
         num_paragraphs = len(paragraphs)
 
         full_text_parts = []
 
-        # Sampling logic for large documents (unchanged)
+        # Lógica de sampling para documentos grandes
         if num_paragraphs > self.PARAGRAPH_LIMIT_FOR_SAMPLING:
             self.logger.info(
-                f"'{source_filename}' has {num_paragraphs} paragraphs. "
-                f"Sampling the first {self.PARAGRAPHS_TO_SAMPLE} and the last {self.PARAGRAPHS_TO_SAMPLE}."
+                f"'{source_filename}' tem {num_paragraphs} parágrafos. "
+                f"Fazendo sampling dos primeiros {self.PARAGRAPHS_TO_SAMPLE} e últimos {self.PARAGRAPHS_TO_SAMPLE}."
             )
 
-            # Extract first paragraphs
+            # Extrai primeiros parágrafos
             for i in range(min(self.PARAGRAPHS_TO_SAMPLE, len(paragraphs))):
                 if paragraphs[i].text.strip():
                     full_text_parts.append(paragraphs[i].text)
 
-            # Add separator
-            full_text_parts.append("\n\n... (content of intermediate paragraphs omitted) ...\n\n")
+            # Adiciona separador
+            full_text_parts.append("\n\n... (conteúdo de parágrafos intermediários omitido) ...\n\n")
 
-            # Extract last paragraphs
+            # Extrai últimos parágrafos
             start_last_paragraphs = max(0, num_paragraphs - self.PARAGRAPHS_TO_SAMPLE)
             for i in range(start_last_paragraphs, num_paragraphs):
                 if paragraphs[i].text.strip():
                     full_text_parts.append(paragraphs[i].text)
 
         else:
-            self.logger.info(f"'{source_filename}' has {num_paragraphs} paragraphs. Extracting all content.")
-            # Extract text from all paragraphs
+            self.logger.info(f"'{source_filename}' tem {num_paragraphs} parágrafos. Extraindo todo o conteúdo.")
+
+            # Extrai texto de todos os parágrafos
             for para in paragraphs:
                 if para.text.strip():
                     full_text_parts.append(para.text)
 
-            # Extract text from all tables
+            # Extrai texto de todas as tabelas
             if document.tables:
                 for table in document.tables:
                     for row in table.rows:
@@ -138,17 +149,17 @@ class DocxExtractor(BaseExtractor):
         return "\n\n".join(full_text_parts)
 
     def _apply_ocr_extraction(self, docx_path: Path, source_filename: str) -> str:
-        """Applies OCR to extract text from images in DOCX."""
+        """Aplica OCR para extrair texto de imagens no DOCX."""
         try:
             ocr_processor = self._get_ocr_processor()
-            if not ocr_processor.is_available():
-                self.logger.warning(f"OCR not available for '{source_filename}'. Install with: pip install easyocr")
+            if not ocr_processor or not ocr_processor.is_available():
+                self.logger.warning(f"OCR não disponível para '{source_filename}'. Instale com: pip install easyocr")
                 return ""
 
-            # Extract images from DOCX and apply OCR
+            # Extrai imagens do DOCX e aplica OCR
             image_texts = []
 
-            # DOCX is a ZIP file - extract images directly
+            # DOCX é um arquivo ZIP - extrai imagens diretamente
             with zipfile.ZipFile(docx_path, 'r') as zip_file:
                 media_files = [f for f in zip_file.namelist() if f.startswith('word/media/')]
 
@@ -157,7 +168,7 @@ class DocxExtractor(BaseExtractor):
                         try:
                             image_data = zip_file.read(media_file)
 
-                            # Save to temp file and apply OCR
+                            # Salva em arquivo temporário e aplica OCR
                             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
                                 image = Image.open(BytesIO(image_data))
                                 if image.mode in ('RGBA', 'LA', 'P'):
@@ -174,28 +185,43 @@ class DocxExtractor(BaseExtractor):
                                     os.remove(temp_path)
 
                         except Exception as e:
-                            self.logger.warning(f"Failed to process image {media_file}: {e}")
+                            self.logger.warning(f"Falha ao processar imagem {media_file}: {e}")
                             continue
 
             result_text = "\n\n".join(image_texts)
 
             if result_text:
-                self.logger.info(f"OCR extracted {len(result_text)} characters from images in '{source_filename}'")
+                self.logger.info(f"OCR extraiu {len(result_text)} caracteres de imagens em '{source_filename}'")
                 return result_text
             else:
-                self.logger.warning(f"No text found in images of '{source_filename}'")
+                self.logger.warning(f"Nenhum texto encontrado em imagens de '{source_filename}'")
                 return ""
 
         except Exception as e:
-            self.logger.error(f"OCR failed for '{source_filename}': {e}")
+            self.logger.error(f"OCR falhou para '{source_filename}': {e}")
             return ""
 
-    def _create_error_result(self, source_file: str, error_message: str) -> ExtractionResult:
-        """Creates a standardized error result."""
-        self.logger.error(f"Error in file '{source_file}': {error_message}")
-        return ExtractionResult(
-            source_file=source_file,
-            content=None,
-            success=False,
-            error_message=error_message
-        )
+    def _get_quality_analyzer(self):
+        """Inicialização lazy do analisador de qualidade."""
+        if self.quality_analyzer is None:
+            try:
+                from ..utils.text_quality import TextQualityAnalyzer
+                self.quality_analyzer = TextQualityAnalyzer()
+            except ImportError:
+                self.logger.warning("TextQualityAnalyzer não disponível")
+                self.quality_analyzer = None
+        return self.quality_analyzer
+
+    def _get_ocr_processor(self):
+        """Inicialização lazy do processador OCR."""
+        if self.ocr_processor is None:
+            try:
+                from ..utils.ocr_processor import EasyOCRProcessor
+                self.ocr_processor = EasyOCRProcessor(
+                    languages=self.OCR_LANGUAGES,
+                    gpu=self.OCR_USE_GPU
+                )
+            except ImportError:
+                self.logger.warning("EasyOCRProcessor não disponível")
+                self.ocr_processor = None
+        return self.ocr_processor
