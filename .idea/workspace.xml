@@ -5,25 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d74841a5-4e92-4198-a059-119b9f97e4db" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/data/input/image_ocr_test_2.docx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/fluxo.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/pipelinerunner.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test_validation_script.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Pymupdf.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Pymupdf.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/material_theme_project_new.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/material_theme_project_new.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Pipelinerunner.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/input/pdf_para_ocr.pdf" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/output/Introduction to neural networks.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/output/image_ocr_test.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/output/lec21_history_neural_networks_typednotes.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/output/pdf_para_ocr.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/extractors/docx_extractor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extractors/docx_extractor.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/extractors/pdf_extractor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extractors/pdf_extractor.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/ocr_processor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/ocr_processor.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/text_quality.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/text_quality.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -87,7 +70,7 @@
       <updated>1749912565559</updated>
       <workItem from="1749912566770" duration="650000" />
       <workItem from="1750025967471" duration="3532000" />
-      <workItem from="1750029510325" duration="2524000" />
+      <workItem from="1750029510325" duration="5614000" />
     </task>
     <servers />
   </component>

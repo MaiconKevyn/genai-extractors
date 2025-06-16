@@ -1,0 +1,39 @@
+# IDE specific files
+.idea
+.vscode
+*.sublime-project
+*.sublime-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Project specific
+data/temp/
+data/ocr_debug/
+*.log
+.env
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
