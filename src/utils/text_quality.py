@@ -8,29 +8,29 @@ logger = logging.getLogger(__name__)
 
 class TextQualityAnalyzer:
     """
-    Analisa a qualidade do texto extraído e determina se precisa de processamento adicional.
-    Enhanced version com scoring detalhado e configurações do settings.py.
+    Analyzes the quality of extracted text and determines if additional processing is needed.
+    Enhanced version with detailed scoring and settings from settings.py.
     """
 
     def __init__(self, config: Dict[str, Any] = None, debug_mode: bool = False):
         """
-        Inicializa o analisador com configurações personalizáveis.
+        Initializes the analyzer with customizable configurations.
 
         Args:
-            config: Dicionário com configurações (min_length, max_replacement_ratio, etc.)
-            debug_mode: Se True, mostra debug detalhado do scoring
+            config: Dictionary with configurations (min_length, max_replacement_ratio, etc.)
+            debug_mode: If True, shows detailed scoring debug information
         """
         self.config = config or self._get_default_config()
         self.debug_mode = debug_mode
 
     def _get_default_config(self) -> Dict[str, Any]:
-        """Configurações padrão - integradas com settings.py."""
+        """Default configurations - integrated with settings.py."""
         try:
-            # Tenta importar configurações do settings.py
+            # Try to import configurations from settings.py
             from config.settings import get_quality_config
             return get_quality_config()
         except ImportError:
-            # Fallback para configurações hardcoded
+            # Fallback to hardcoded configurations
             return {
                 'min_text_length': 50,
                 'max_replacement_chars': 5,
@@ -43,10 +43,10 @@ class TextQualityAnalyzer:
 
     def analyze_quality(self, text: str) -> Dict[str, Any]:
         """
-        Analisa a qualidade do texto e retorna métricas detalhadas.
+        Analyzes text quality and returns detailed metrics.
 
         Returns:
-            Dict com: is_poor_quality, needs_ocr, quality_score, metrics, recommendations
+            Dict with: is_poor_quality, needs_ocr, quality_score, metrics, recommendations
         """
         if not text:
             return {
@@ -78,14 +78,14 @@ class TextQualityAnalyzer:
             'scoring_breakdown': scoring_breakdown
         }
 
-        # 🆕 Log estruturado e claro
+        # Structured and clear logging
         self._log_quality_analysis(result)
 
         return result
 
     def _calculate_quality_score_with_debug(self, metrics: Dict[str, Any]) -> tuple:
         """
-        Calcula score com breakdown detalhado para debug.
+        Calculates score with detailed breakdown for debugging.
 
         Returns:
             tuple: (final_score, scoring_breakdown)
@@ -94,93 +94,93 @@ class TextQualityAnalyzer:
         penalties = []
 
         if self.debug_mode:
-            print(f"\n🔍 DEBUG SCORING:")
-            print(f"   📊 Starting score: {score}")
-            print(f"   📋 Metrics: {metrics}")
+            print(f"\nDEBUG SCORING:")
+            print(f"   Starting score: {score}")
+            print(f"   Metrics: {metrics}")
 
-        # PENALIDADE 1: Texto muito curto
+        # PENALTY 1: Text too short
         if metrics['total_chars'] < self.config['min_text_length']:
             penalty = 50
             score -= penalty
             penalties.append({
-                'type': 'texto_muito_curto',
+                'type': 'text_too_short',
                 'penalty': penalty,
                 'reason': f"Chars: {metrics['total_chars']} < {self.config['min_text_length']}",
                 'remaining_score': score
             })
             if self.debug_mode:
-                print(f"   ⚠️  -{penalty} pontos: Texto muito curto ({metrics['total_chars']} chars)")
+                print(f"   -{penalty} points: Text too short ({metrics['total_chars']} chars)")
 
-        # PENALIDADE 2: Caracteres de substituição
+        # PENALTY 2: Replacement characters
         if metrics['replacement_ratio'] > 0:
             penalty = metrics['replacement_ratio'] * 5000
             score -= penalty
             penalties.append({
-                'type': 'caracteres_substituicao',
+                'type': 'replacement_characters',
                 'penalty': penalty,
                 'reason': f"Replacement ratio: {metrics['replacement_ratio']:.3f}",
                 'remaining_score': score
             })
             if self.debug_mode:
-                print(f"   ⚠️  -{penalty:.1f} pontos: Caracteres � ({metrics['replacement_chars']} chars)")
+                print(f"   -{penalty:.1f} points: Replacement characters ({metrics['replacement_chars']} chars)")
 
-        # PENALIDADE 3: Baixa proporção ASCII
+        # PENALTY 3: Low ASCII ratio
         if metrics['ascii_ratio'] < self.config['min_ascii_ratio']:
             penalty = (self.config['min_ascii_ratio'] - metrics['ascii_ratio']) * 100
             score -= penalty
             penalties.append({
-                'type': 'baixa_ascii_ratio',
+                'type': 'low_ascii_ratio',
                 'penalty': penalty,
                 'reason': f"ASCII ratio: {metrics['ascii_ratio']:.3f} < {self.config['min_ascii_ratio']}",
                 'remaining_score': score
             })
             if self.debug_mode:
-                print(f"   ⚠️  -{penalty:.1f} pontos: ASCII ratio baixo ({metrics['ascii_ratio']:.3f})")
+                print(f"   -{penalty:.1f} points: Low ASCII ratio ({metrics['ascii_ratio']:.3f})")
 
-        # PENALIDADE 4: Poucas palavras
+        # PENALTY 4: Few words
         if metrics['word_count'] < self.config['min_word_count']:
             penalty = 30
             score -= penalty
             penalties.append({
-                'type': 'poucas_palavras',
+                'type': 'few_words',
                 'penalty': penalty,
                 'reason': f"Words: {metrics['word_count']} < {self.config['min_word_count']}",
                 'remaining_score': score
             })
             if self.debug_mode:
-                print(f"   ⚠️  -{penalty} pontos: Poucas palavras ({metrics['word_count']})")
+                print(f"   -{penalty} points: Few words ({metrics['word_count']})")
 
-        # PENALIDADE 5: Palavras muito curtas
+        # PENALTY 5: Words too short
         if metrics['avg_word_length'] < 3:
             penalty = 20
             score -= penalty
             penalties.append({
-                'type': 'palavras_curtas',
+                'type': 'short_words',
                 'penalty': penalty,
                 'reason': f"Avg word length: {metrics['avg_word_length']:.2f} < 3.0",
                 'remaining_score': score
             })
             if self.debug_mode:
-                print(f"   ⚠️  -{penalty} pontos: Palavras curtas ({metrics['avg_word_length']:.2f})")
+                print(f"   -{penalty} points: Short words ({metrics['avg_word_length']:.2f})")
 
-        # PENALIDADE 6: Muita pontuação
+        # PENALTY 6: Too much punctuation
         if metrics['punctuation_ratio'] > 0.3:
             penalty = 15
             score -= penalty
             penalties.append({
-                'type': 'muita_pontuacao',
+                'type': 'excessive_punctuation',
                 'penalty': penalty,
                 'reason': f"Punct ratio: {metrics['punctuation_ratio']:.3f} > 0.3",
                 'remaining_score': score
             })
             if self.debug_mode:
-                print(f"   ⚠️  -{penalty} pontos: Muita pontuação ({metrics['punctuation_ratio']:.3f})")
+                print(f"   -{penalty} points: Excessive punctuation ({metrics['punctuation_ratio']:.3f})")
 
         final_score = max(0.0, min(100.0, score))
 
         if self.debug_mode:
-            print(f"   📊 Score final: {final_score:.1f}/100")
-            print(f"   🎯 Total penalties: {len(penalties)}")
+            print(f"   Final score: {final_score:.1f}/100")
+            print(f"   Total penalties: {len(penalties)}")
 
         scoring_breakdown = {
             'initial_score': 100.0,
@@ -193,19 +193,19 @@ class TextQualityAnalyzer:
         return final_score, scoring_breakdown
 
     def _calculate_metrics(self, text: str) -> Dict[str, Any]:
-        """Calcula métricas detalhadas do texto."""
+        """Calculates detailed text metrics."""
         total_chars = len(text)
 
-        # Contadores básicos
+        # Basic counters
         replacement_chars = text.count('\ufffd')
         words = re.findall(r"\w+", text)
         word_count = len(words)
 
-        # Caracteres ASCII vs Unicode
+        # ASCII vs Unicode characters
         ascii_count = sum(1 for c in text if ord(c) < 128)
         ascii_ratio = ascii_count / total_chars if total_chars > 0 else 0
 
-        # Densidade de pontuação
+        # Punctuation density
         punct_count = sum(1 for c in text if c in string.punctuation)
         punct_ratio = punct_count / total_chars if total_chars > 0 else 0
 
@@ -221,12 +221,12 @@ class TextQualityAnalyzer:
 
     def _evaluate_quality(self, metrics: Dict[str, Any], quality_score: float) -> tuple:
         """
-        Avalia se a qualidade é pobre e identifica a razão principal.
-        Agora usa tanto métricas quanto o score calculado.
+        Evaluates if quality is poor and identifies the main reason.
+        Now uses both metrics and calculated score.
         """
-        # Se o score já é muito baixo, considera pobre
+        # If the score is already very low, consider it poor
         if quality_score < self.config['ocr_threshold_score']:
-            # Identifica a razão específica baseada nas métricas
+            # Identifies the specific reason based on metrics
             if metrics['total_chars'] < self.config['min_text_length']:
                 return True, 'too_short'
             elif metrics['replacement_chars'] > self.config['max_replacement_chars']:
@@ -244,13 +244,13 @@ class TextQualityAnalyzer:
 
     def _determine_ocr_need(self, quality_score: float, reason: str, metrics: Dict[str, Any]) -> bool:
         """
-        Determina se o documento precisa de OCR baseado em múltiplos fatores.
+        Determines if the document needs OCR based on multiple factors.
         """
-        # Score muito baixo sempre indica necessidade de OCR
+        # Very low score always indicates need for OCR
         if quality_score < self.config['ocr_threshold_score']:
             return True
 
-        # Problemas específicos que indicam documento escaneado
+        # Specific problems that indicate a scanned document
         ocr_indicators = [
             'too_many_replacement_chars',
             'high_replacement_ratio',
@@ -261,14 +261,14 @@ class TextQualityAnalyzer:
         if reason in ocr_indicators:
             return True
 
-        # Heurística adicional: muito pouco texto pode indicar falha na extração
+        # Additional heuristic: very little text may indicate extraction failure
         if metrics.get('word_count', 0) < 20 and metrics.get('total_chars', 0) > 100:
             return True
 
         return False
 
     def _get_quality_level(self, score: float) -> str:
-        """Converte score numérico em nível qualitativo."""
+        """Converts numeric score to qualitative level."""
         if score >= 90:
             return "EXCELLENT"
         elif score >= 75:
@@ -281,7 +281,7 @@ class TextQualityAnalyzer:
             return "CRITICAL"
 
     def _get_recommendations(self, reason: str, metrics: Dict[str, Any], needs_ocr: bool) -> list:
-        """Retorna recomendações baseadas na análise completa."""
+        """Returns recommendations based on the complete analysis."""
 
         base_recommendations = {
             'empty_text': ['Check if file is valid', 'Verify file format'],
@@ -296,50 +296,51 @@ class TextQualityAnalyzer:
 
         recommendations = base_recommendations.get(reason, ['Manual review recommended'])
 
-        # Adiciona recomendação específica de OCR se necessário
+        # Add specific OCR recommendation if needed
         if needs_ocr and 'OCR' not in str(recommendations):
-            recommendations.insert(0, '🔍 PRIORITY: Apply OCR processing')
+            recommendations.insert(0, 'PRIORITY: Apply OCR processing')
 
         return recommendations
 
     def _log_quality_analysis(self, result: Dict[str, Any]) -> None:
         """
-        Gera logs claros e informativos sobre a análise de qualidade.
+        Generates clear and informative logs about the quality analysis.
         """
         quality_score = result['quality_score']
         quality_level = result['quality_level']
         needs_ocr = result['needs_ocr']
         reason = result['reason']
 
-        # 🎯 Log principal - sempre visível
-        ocr_status = "🔍 OCR NEEDED" if needs_ocr else "✅ OCR NOT NEEDED"
+        # Main log - always visible
+        ocr_status = "OCR NEEDED" if needs_ocr else "OCR NOT NEEDED"
 
         logger.info(
-            f"📊 QUALITY ANALYSIS: {ocr_status} | "
+            f"QUALITY ANALYSIS: {ocr_status} | "
             f"Score: {quality_score:.1f}/100 | "
             f"Level: {quality_level} | "
             f"Reason: {reason}"
         )
 
-        # Log breakdown se debug estiver ativo
+        # Log breakdown if debug is active
         if self.debug_mode and result.get('scoring_breakdown'):
             breakdown = result['scoring_breakdown']
             logger.info(
-                f"🔍 SCORING BREAKDOWN: {len(breakdown['penalties'])} penalties, total: -{breakdown['total_penalty']:.1f}")
+                f"SCORING BREAKDOWN: {len(breakdown['penalties'])} penalties, total: -{breakdown['total_penalty']:.1f}")
             for penalty in breakdown['penalties']:
                 logger.info(f"   • {penalty['type']}: -{penalty['penalty']:.1f} ({penalty['reason']})")
 
-        # Log detalhado se qualidade for problemática
+        # Detailed log if quality is problematic
         if result['is_poor_quality']:
             metrics = result['metrics']
             logger.warning(
-                f"⚠️  QUALITY DETAILS: "
+                f"QUALITY DETAILS: "
                 f"Words: {metrics.get('word_count', 0)}, "
                 f"Chars: {metrics.get('total_chars', 0)}, "
                 f"Replacement chars: {metrics.get('replacement_chars', 0)}, "
                 f"ASCII ratio: {metrics.get('ascii_ratio', 0):.2f}"
             )
 
-            # Recomendações específicas
+            # Specific recommendations
             recommendations = result['recommendations']
-            logger.warning(f"💡 RECOMMENDATIONS: {' | '.join(recommendations)}")
+            logger.warning(f"RECOMMENDATIONS: {' | '.join(recommendations)}")
+

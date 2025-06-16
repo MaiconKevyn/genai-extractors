@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="d74841a5-4e92-4198-a059-119b9f97e4db" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/data/input/image_ocr_test_2.docx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/fluxo.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pipelinerunner.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test_validation_script.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Pymupdf.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Pymupdf.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/material_theme_project_new.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/material_theme_project_new.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Pipelinerunner.ipynb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/input/pdf_para_ocr.pdf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/output/Introduction to neural networks.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/output/image_ocr_test.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/output/lec21_history_neural_networks_typednotes.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/output/pdf_para_ocr.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/extractors/docx_extractor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extractors/docx_extractor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/extractors/pdf_extractor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extractors/pdf_extractor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/ocr_processor.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/ocr_processor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/text_quality.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/text_quality.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 0
+}</component>
+  <component name="ProjectId" id="2yVGwTUpQzSIgfkFvBfx0SttQwv" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "main",
+    "ignore_missing_gitignore": "true",
+    "last_opened_file_path": "/home/maiconkevyn/PycharmProjects/genai-extractors/data/input",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/data/input" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-6a121458b545-JavaScript-PY-251.25410.159" />
+        <option value="bundled-python-sdk-e0ed3721d81e-36ea0e71a18c-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-251.25410.159" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="d74841a5-4e92-4198-a059-119b9f97e4db" name="Changes" comment="" />
+      <created>1749912565559</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1749912565559</updated>
+      <workItem from="1749912566770" duration="650000" />
+      <workItem from="1750025967471" duration="3532000" />
+      <workItem from="1750029510325" duration="2524000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>
