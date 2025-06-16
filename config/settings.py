@@ -1,6 +1,6 @@
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List
 
 
 @dataclass
@@ -14,24 +14,6 @@ class ExtractorConfig:
     def __post_init__(self):
         if self.supported_extensions is None:
             self.supported_extensions = ['.pdf', '.docx', '.xlsx', '.csv']
-
-
-@dataclass
-class QualityConfig:
-    """Configuration for text quality analysis"""
-    # Thresholds básicos
-    min_text_length: int = 50
-    max_replacement_chars: int = 5
-    min_word_count: int = 10
-    max_replacement_ratio: float = 0.01
-    min_ascii_ratio: float = 0.8
-
-    # OCR decision thresholds
-    ocr_threshold_score: float = 60.0  # Score abaixo disso = OCR needed
-    severe_quality_threshold: float = 30.0
-
-    # Debug
-    debug_mode: bool = False  # Ativa logs detalhados
 
 
 @dataclass
@@ -62,7 +44,6 @@ class OCRConfig:
 
 # Global configurations
 EXTRACTOR_CONFIG = ExtractorConfig()
-QUALITY_CONFIG = QualityConfig()
 OCR_CONFIG = OCRConfig()
 
 # Project paths
@@ -82,22 +63,7 @@ OCR_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def get_quality_config() -> Dict[str, Any]:
-    """
-    Retorna configurações de qualidade como dicionário para TextQualityAnalyzer.
-    """
-    return {
-        'min_text_length': QUALITY_CONFIG.min_text_length,
-        'max_replacement_chars': QUALITY_CONFIG.max_replacement_chars,
-        'min_word_count': QUALITY_CONFIG.min_word_count,
-        'max_replacement_ratio': QUALITY_CONFIG.max_replacement_ratio,
-        'min_ascii_ratio': QUALITY_CONFIG.min_ascii_ratio,
-        'ocr_threshold_score': QUALITY_CONFIG.ocr_threshold_score,
-        'severe_quality_threshold': QUALITY_CONFIG.severe_quality_threshold
-    }
-
-
-def validate_ocr_dependencies() -> Dict[str, bool]:
+def validate_ocr_dependencies() -> dict:
     """
     Valida se as dependências OCR estão disponíveis (EasyOCR).
 
@@ -142,41 +108,6 @@ def validate_ocr_dependencies() -> Dict[str, bool]:
         status['torch_available'] = False
 
     return status
-
-
-# Configurações específicas por tipo de documento (mantidas)
-DOCUMENT_TYPE_CONFIGS = {
-    'academic_papers': QualityConfig(
-        min_text_length=200,
-        min_word_count=50,
-        ocr_threshold_score=80,
-        min_ascii_ratio=0.9
-    ),
-    'forms': QualityConfig(
-        min_text_length=20,
-        min_word_count=5,
-        ocr_threshold_score=40,
-        min_ascii_ratio=0.7
-    ),
-    'multilingual': QualityConfig(
-        min_ascii_ratio=0.6,
-        ocr_threshold_score=50,
-        max_replacement_ratio=0.02
-    )
-}
-
-
-def get_config_for_document_type(doc_type: str) -> QualityConfig:
-    """
-    Retorna configuração específica para tipo de documento.
-
-    Args:
-        doc_type: Tipo do documento ('academic_papers', 'forms', 'multilingual')
-
-    Returns:
-        QualityConfig específica ou padrão
-    """
-    return DOCUMENT_TYPE_CONFIGS.get(doc_type, QUALITY_CONFIG)
 
 
 def setup_ocr_environment():
@@ -233,8 +164,3 @@ if __name__ == "__main__":
     print(f"   Languages: {OCR_CONFIG.languages}")
     print(f"   Use GPU: {OCR_CONFIG.use_gpu}")
     print(f"   Confidence Threshold: {OCR_CONFIG.confidence_threshold}")
-
-    print(f"\n⚙️  Quality Config:")
-    quality_dict = get_quality_config()
-    for key, value in quality_dict.items():
-        print(f"   {key}: {value}")
