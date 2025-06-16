@@ -1,40 +1,61 @@
+# src/managers/file_manager.py
+"""
+FileTypeManager refatorado para usar Factory Pattern.
+Mantém mesma interface pública, mas usa factory internamente.
+"""
+
 import logging
 from pathlib import Path
-from typing import Union, Dict, Type
+from typing import Union, Optional
 
-from src.extractors.base_extractor import BaseExtractor
+from src.extractors.factory import ExtractorFactory
 
 
 class FileTypeManager:
-    """Orchestrates the extraction of data from different file types."""
+    """
+    Orchestrates the extraction of data from different file types.
+    Agora usa Factory Pattern para criar extractors.
+    """
 
-    def __init__(self):
+    def __init__(self, factory: Optional[ExtractorFactory] = None):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._extractors: Dict[str, Type[BaseExtractor]] = {}
 
-    def register_extractor(self, extension: str, extractor_class: Type[BaseExtractor]):
-        normalized_extension = extension.lower()
-        self.logger.info(f"Registering extractor '{extractor_class.__name__}' for extension '{normalized_extension}'")
-        self._extractors[normalized_extension] = extractor_class
+        # Usa factory injetado ou cria um padrão
+        if factory is None:
+            from src.extractors.factory import get_default_factory
+            self.factory = get_default_factory()
+        else:
+            self.factory = factory
+
+    def register_extractor(self, extension: str, extractor_class):
+        """
+        Registra extractor (mantém compatibilidade com código atual).
+        Agora delega para o factory.
+        """
+        self.factory.register(extension, extractor_class)
+        self.logger.info(f"Registering extractor '{extractor_class.__name__}' for extension '{extension.lower()}'")
 
     def process_file(self, input_path: Union[str, Path], output_dir: Union[str, Path]) -> bool:
+        """
+        Processa arquivo usando factory para criar extractor.
+        Mantém mesma assinatura e comportamento.
+        """
         input_path = Path(input_path)
-        extension = input_path.suffix.lower()
-        extractor_class = self._extractors.get(extension)
-
-        if not extractor_class:
-            self.logger.warning(f"No extractor registered for '{extension}'. Skipping '{input_path.name}'.")
-            return False
 
         try:
-            self.logger.info(f"Processing '{input_path.name}' with '{extractor_class.__name__}'")
-            extractor = extractor_class()
+            # Factory cria extractor automaticamente
+            extractor = self.factory.create_extractor(input_path)
 
-            # The output filename continues to be generated in the same way
+            if extractor is None:
+                self.logger.warning(f"No extractor registered for '{input_path.suffix}'. Skipping '{input_path.name}'.")
+                return False
+
+            self.logger.info(f"Processing '{input_path.name}' with '{extractor.__class__.__name__}'")
+
+            # O resto do processamento permanece igual
             output_path = Path(output_dir) / (input_path.stem + '.json')
-
-            # The call to the extractor remains the same
             return extractor.extract_and_save(input_path, output_path)
+
         except Exception as e:
             self.logger.error(f"Unexpected error while processing '{input_path.name}': {e}")
             return False
