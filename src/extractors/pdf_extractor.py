@@ -175,15 +175,13 @@ class PDFTextExtractor(BaseExtractor):
         return self.quality_analyzer
 
     def _get_ocr_processor(self):
-        """Inicialização lazy do processador OCR."""
+        """Inicialização lazy do processador OCR com Pytesseract."""
         if self.ocr_processor is None:
             try:
-                from ..utils.ocr_processor import EasyOCRProcessor
-                self.ocr_processor = EasyOCRProcessor(
-                    languages=self.OCR_LANGUAGES,
-                    gpu=self.OCR_USE_GPU
-                )
+                # Apenas estas duas linhas mudam!
+                from ..utils.pytesseract_processor import PytesseractProcessor
+                self.ocr_processor = PytesseractProcessor(languages='eng+por')
             except ImportError:
-                self.logger.warning("EasyOCRProcessor não disponível")
+                self.logger.warning("PytesseractProcessor não disponível. Verifique a instalação do Tesseract.")
                 self.ocr_processor = None
         return self.ocr_processor
