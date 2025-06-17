@@ -1,70 +1,80 @@
+"""
+Document Text Extraction Module
+
+This module provides specialized text extraction capabilities for Microsoft Word
+documents (.docx format) using the python-docx library.
+
+Classes:
+    DocxExtractor: Main class for DOCX text extraction with intelligent sampling
+"""
+
 import docx  # python-docx library
-import zipfile
-import tempfile
-import os
 from pathlib import Path
 from typing import Union
-from PIL import Image
-from io import BytesIO
 
 from .base_extractor import BaseExtractor, ExtractionResult
 
 
 class DocxExtractor(BaseExtractor):
     """
-    Extrai texto de arquivos .docx com sampling para arquivos grandes e OCR para imagens.
-    Versão simplificada sem configurações complexas.
+    DOCX text extractor with intelligent sampling for large documents.
+
+    This class specializes in extracting text content from Microsoft Word documents
+    using the python-docx library. The extractor implements an intelligent sampling strategy for
+    large documents to maintain reasonable processing times while preserving
+    representative content from both text and tabular data.
+
+    Attributes:
+        PARAGRAPH_LIMIT_FOR_SAMPLING (int): Threshold above which sampling is triggered.
+            Documents with more paragraphs will use sampling strategy.
+        PARAGRAPHS_TO_SAMPLE (int): Number of paragraphs to extract from beginning
+            and end when sampling is active.
     """
 
     def __init__(self):
+        """Initialize the DOCX text extractor with optimized sampling configuration."""
         super().__init__()
 
-        # Configurações diretas e simples
+        # Sampling settings for large files
         self.PARAGRAPH_LIMIT_FOR_SAMPLING = 180
         self.PARAGRAPHS_TO_SAMPLE = 90
-        self.OCR_LANGUAGES = 'eng+por'  # Tesseract format: eng+por
-        self.OCR_CONFIG = '--psm 3'  # Page Segmentation Mode
-
-        # Componentes inicializados sob demanda
-        self.ocr_processor = None
 
     def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
         """
-        Extrai texto de DOCX seguindo mesmo padrão do PDF:
-        1. Extração padrão → 2. Análise de qualidade → 3. OCR se necessário
+        Extracts text from DOCX using python-docx.
+
+        This method orchestrates the complete DOCX text extraction workflow, including
+        file validation, format verification, content extraction from both paragraphs
+        and tables, and intelligent sampling for large documents.
 
         Args:
-            input_path: Caminho para o arquivo DOCX
+            input_path (Union[str, Path]): Path to the DOCX file to process.
+                Accepts both string paths and Path objects for maximum flexibility.
+                Must point to an existing, readable DOCX file.
 
         Returns:
-            ExtractionResult com conteúdo extraído
+            ExtractionResult: Comprehensive result object containing:
+                - source_file: Original filename for tracking and logging
+                - content: Extracted text content including tables (None if failed)
+                - success: Boolean extraction status indicator
+                - error_message: Detailed error information if extraction failed
+
+        Raises:
+            No exceptions are raised. All errors are caught and returned
+            as failed ExtractionResult objects with descriptive error messages.
         """
         docx_path = Path(input_path)
         source_filename = docx_path.name
 
-        # Validações básicas
+        # Basic validations
         if not docx_path.exists():
-            return self._create_error_result(source_filename, f"Arquivo não encontrado: {docx_path}")
+            return self._create_error_result(source_filename, f"File not found: {docx_path}")
 
         if docx_path.suffix.lower() != '.docx':
-            return self._create_error_result(source_filename, f"Arquivo não é DOCX: {docx_path.suffix}")
+            return self._create_error_result(source_filename, f"File is not DOCX: {docx_path.suffix}")
 
         try:
-            # ETAPA 1: Extração padrão de texto
-            extracted_text = self._extract_standard_text(docx_path, source_filename)
-
-            # ETAPA 2: Verifica se precisa de OCR usando heurística simples
-            if self._needs_ocr(extracted_text):
-                self.logger.info(f"Qualidade ruim detectada para '{source_filename}'. Aplicando OCR...")
-
-                # ETAPA 3: Aplicar OCR
-                ocr_text = self._apply_ocr_extraction(docx_path, source_filename)
-
-                if ocr_text and len(ocr_text.strip()) > len(extracted_text.strip()):
-                    self.logger.info(f"OCR melhorou qualidade do texto para '{source_filename}'")
-                    extracted_text = ocr_text
-                else:
-                    self.logger.warning(f"OCR não melhorou qualidade para '{source_filename}', mantendo original")
+            extracted_text = self._extract_text(docx_path, source_filename)
 
             return ExtractionResult(
                 source_file=source_filename,
@@ -75,44 +85,67 @@ class DocxExtractor(BaseExtractor):
         except Exception as e:
             return self._create_error_result(source_filename, str(e))
 
-    def _extract_standard_text(self, docx_path: Path, source_filename: str) -> str:
-        """Extrai texto usando método padrão (python-docx)."""
+    def _extract_text(self, docx_path: Path, source_filename: str) -> str:
+        """
+        Core text extraction logic with intelligent sampling for large documents.
+
+        This method implements the comprehensive extraction algorithm that handles
+        both paragraphs and tables while automatically choosing between full
+        extraction and sampling based on document size. The algorithm is designed
+        to maximize content fidelity while maintaining optimal performance.
+
+        Args:
+            docx_path (Path): Validated path to the DOCX file
+            source_filename (str): Original filename for logging and error reporting
+
+        Returns:
+            str: Comprehensive extracted text content with proper formatting.
+                Paragraphs and table content are separated with double newlines
+                for optimal readability and structure preservation.
+
+        Raises:
+            docx.opc.exceptions.PackageNotFoundError: If DOCX format is invalid
+            PermissionError: If file access is denied
+            MemoryError: If document exceeds available memory capacity
+
+
+        """
         document = docx.Document(str(docx_path))
         paragraphs = document.paragraphs
         num_paragraphs = len(paragraphs)
 
         full_text_parts = []
 
-        # Lógica de sampling para documentos grandes
+        # Sampling logic for large documents
         if num_paragraphs > self.PARAGRAPH_LIMIT_FOR_SAMPLING:
             self.logger.info(
-                f"'{source_filename}' tem {num_paragraphs} parágrafos. "
-                f"Fazendo sampling dos primeiros {self.PARAGRAPHS_TO_SAMPLE} e últimos {self.PARAGRAPHS_TO_SAMPLE}."
+                f"'{source_filename}' has {num_paragraphs} paragraphs. "
+                f"Sampling the first {self.PARAGRAPHS_TO_SAMPLE} and last {self.PARAGRAPHS_TO_SAMPLE}."
             )
 
-            # Extrai primeiros parágrafos
+            # Extract first paragraphs
             for i in range(min(self.PARAGRAPHS_TO_SAMPLE, len(paragraphs))):
                 if paragraphs[i].text.strip():
                     full_text_parts.append(paragraphs[i].text)
 
-            # Adiciona separador
-            full_text_parts.append("\n\n... (conteúdo de parágrafos intermediários omitido) ...\n\n")
+            # Add separator
+            full_text_parts.append("\n\n... (intermediate paragraph content omitted) ...\n\n")
 
-            # Extrai últimos parágrafos
+            # Extract last paragraphs
             start_last_paragraphs = max(0, num_paragraphs - self.PARAGRAPHS_TO_SAMPLE)
             for i in range(start_last_paragraphs, num_paragraphs):
                 if paragraphs[i].text.strip():
                     full_text_parts.append(paragraphs[i].text)
 
         else:
-            self.logger.info(f"'{source_filename}' tem {num_paragraphs} parágrafos. Extraindo todo o conteúdo.")
+            self.logger.info(f"'{source_filename}' has {num_paragraphs} paragraphs. Extracting all content.")
 
-            # Extrai texto de todos os parágrafos
+            # Extract text from all paragraphs
             for para in paragraphs:
                 if para.text.strip():
                     full_text_parts.append(para.text)
 
-            # Extrai texto de todas as tabelas
+            # Extract text from all tables
             if document.tables:
                 for table in document.tables:
                     for row in table.rows:
@@ -120,90 +153,8 @@ class DocxExtractor(BaseExtractor):
                             if cell.text.strip():
                                 full_text_parts.append(cell.text)
 
-        return "\n\n".join(full_text_parts)
+        extracted_text = "\n\n".join(full_text_parts)
+        self.logger.info(f"Extracted {len(extracted_text)} characters from '{source_filename}'")
 
-    def _needs_ocr(self, text: str) -> bool:
-        """
-        Verifica se o texto extraído precisa de OCR usando heurística simples.
+        return extracted_text
 
-        Args:
-            text: Texto extraído
-
-        Returns:
-            bool: True se precisar de OCR
-        """
-        try:
-            from ..utils.text_quality import needs_ocr
-            return needs_ocr(text)
-        except ImportError:
-            # Fallback simples se o módulo não estiver disponível
-            return not text or len(text.strip()) < 50
-
-    def _apply_ocr_extraction(self, docx_path: Path, source_filename: str) -> str:
-        """Aplica OCR para extrair texto de imagens no DOCX usando Tesseract."""
-        try:
-            ocr_processor = self._get_ocr_processor()
-            if not ocr_processor or not ocr_processor.is_available():
-                self.logger.warning(
-                    f"Tesseract OCR não disponível para '{source_filename}'. Instale com: pip install pytesseract")
-                return ""
-
-            # Extrai imagens do DOCX e aplica OCR
-            image_texts = []
-
-            # DOCX é um arquivo ZIP - extrai imagens diretamente
-            with zipfile.ZipFile(docx_path, 'r') as zip_file:
-                media_files = [f for f in zip_file.namelist() if f.startswith('word/media/')]
-
-                for media_file in media_files:
-                    if any(media_file.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.bmp']):
-                        try:
-                            image_data = zip_file.read(media_file)
-
-                            # Salva em arquivo temporário e aplica OCR
-                            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
-                                image = Image.open(BytesIO(image_data))
-                                if image.mode in ('RGBA', 'LA', 'P'):
-                                    image = image.convert('RGB')
-                                image.save(temp_file.name, 'PNG')
-                                temp_path = temp_file.name
-
-                            try:
-                                text = ocr_processor.extract_text_from_image_file(temp_path)
-                                if text.strip():
-                                    image_texts.append(text)
-                            finally:
-                                if os.path.exists(temp_path):
-                                    os.remove(temp_path)
-
-                        except Exception as e:
-                            self.logger.warning(f"Falha ao processar imagem {media_file}: {e}")
-                            continue
-
-            result_text = "\n\n".join(image_texts)
-
-            if result_text:
-                self.logger.info(
-                    f"Tesseract OCR extraiu {len(result_text)} caracteres de imagens em '{source_filename}'")
-                return result_text
-            else:
-                self.logger.warning(f"Nenhum texto encontrado em imagens de '{source_filename}'")
-                return ""
-
-        except Exception as e:
-            self.logger.error(f"Tesseract OCR falhou para '{source_filename}': {e}")
-            return ""
-
-    def _get_ocr_processor(self):
-        """Inicialização lazy do processador OCR com Tesseract."""
-        if self.ocr_processor is None:
-            try:
-                from ..utils.pytesseract_processor import PytesseractProcessor
-                self.ocr_processor = PytesseractProcessor(
-                    languages=self.OCR_LANGUAGES,
-                    config=self.OCR_CONFIG
-                )
-            except ImportError:
-                self.logger.warning("PytesseractProcessor não disponível. Instale com: pip install pytesseract")
-                self.ocr_processor = None
-        return self.ocr_processor

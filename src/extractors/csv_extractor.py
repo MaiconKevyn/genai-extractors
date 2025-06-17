@@ -1,25 +1,59 @@
+"""
+CSV Data Extraction Module
+
+This module provides optimized text extraction capabilities for CSV (Comma-Separated Values)
+files with intelligent character-based sampling for large datasets.
+
+Classes:
+    CSVTextExtractor: Streamlined class for high-performance CSV text extraction
+
+"""
+
 import csv
-import logging
 from pathlib import Path
 from typing import Union
-
-# Imports the base class and unified result
 from .base_extractor import BaseExtractor, ExtractionResult
 
+class CSVTextExtractor(BaseExtractor):
+    """
+    This class provides a simplified, high-speed approach to extracting text content
+    from CSV files. It uses character-based sampling instead of complex row analysis,
+    achieving superior performance characteristics suitable for high-volume data
+    processing workflows and analytics pipelines.
 
-class CsvExtractor(BaseExtractor):
-    """Extracts text from .csv files, with sampling for large files based on rows."""
+    Attributes:
+        MAX_TOTAL_CHARACTERS (int): Maximum character limit for extracted content.
+            Files exceeding this limit will be intelligently sampled to maintain
+            this size constraint while preserving content representativeness.
+
+    """
+
+    MAX_TOTAL_CHARACTERS = 30000  # Approximate size limit (~10 pages)
 
     def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        # Constants for sampling logic (same pattern as DOCX)
-        self.ROW_LIMIT_FOR_SAMPLING = 1000  # Similar to paragraph limit
-        self.ROWS_TO_SAMPLE = 500  # Similar to paragraphs to sample
+        """ Initialize the CSV extractor configuration. """
+        super().__init__()
 
     def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
         """
-        Extracts text from a .csv. If the file has more than 1000 rows,
-        extracts only the first 500 and the last 500.
+        Extract text content from CSV files with streamlined character-based processing.
+
+        Args:
+            input_path (Union[str, Path]): Path to the CSV file to process.
+                Accepts both string paths and Path objects for maximum flexibility.
+                Must point to an existing, readable CSV file.
+
+        Returns:
+            ExtractionResult: Streamlined result object containing:
+                - source_file: Original filename for tracking
+                - content: Extracted text content with consistent size (None if failed)
+                - success: Boolean extraction status
+                - error_message: Detailed error information if extraction failed
+
+        Raises:
+            No exceptions are raised. All errors are caught and returned
+            as failed ExtractionResult objects with descriptive error messages.
+
         """
         csv_path = Path(input_path)
         source_filename = csv_path.name
@@ -28,93 +62,63 @@ class CsvExtractor(BaseExtractor):
             return self._create_error_result(source_filename, f"File not found: {csv_path}")
 
         if csv_path.suffix.lower() != '.csv':
-            return self._create_error_result(source_filename, f"File is not a .csv: {csv_path.suffix}")
+            return self._create_error_result(source_filename, f"File is not CSV: {csv_path.suffix}")
 
         try:
-            # Read CSV and count rows first
-            with open(csv_path, 'r', encoding='utf-8', newline='') as file:
-                reader = csv.reader(file)
-                all_rows = list(reader)
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                lines = [' '.join(row).strip() for row in reader if any(row)]
 
-            num_rows = len(all_rows)
+            full_text = "\n".join(lines)
 
-            if num_rows == 0:
-                return self._create_error_result(source_filename, "CSV file is empty")
-
-            full_text_parts = []
-
-            # Sampling logic for large files (same pattern as DOCX)
-            if num_rows > self.ROW_LIMIT_FOR_SAMPLING:
-                self.logger.info(
-                    f"'{source_filename}' has {num_rows} rows (above the limit of {self.ROW_LIMIT_FOR_SAMPLING}). "
-                    f"Sampling the first {self.ROWS_TO_SAMPLE} and the last {self.ROWS_TO_SAMPLE}."
-                )
-
-                # Extract header (first row)
-                if all_rows:
-                    full_text_parts.append("HEADERS: " + " | ".join(all_rows[0]))
-
-                # Extract first rows
-                for i in range(1, min(self.ROWS_TO_SAMPLE + 1, len(all_rows))):
-                    row_text = " | ".join(str(cell) for cell in all_rows[i])
-                    if row_text.strip():
-                        full_text_parts.append(f"Row {i}: {row_text}")
-
-                # Add separator
-                full_text_parts.append("\n... (content of intermediate rows omitted) ...\n")
-
-                # Extract last rows
-                start_last_rows = max(1, num_rows - self.ROWS_TO_SAMPLE)
-                for i in range(start_last_rows, num_rows):
-                    row_text = " | ".join(str(cell) for cell in all_rows[i])
-                    if row_text.strip():
-                        full_text_parts.append(f"Row {i}: {row_text}")
-
+            # Check if the total character count exceeds the limit
+            if len(full_text) <= self.MAX_TOTAL_CHARACTERS:
+                # No sampling needed, return full text
+                sampled_text = full_text
             else:
-                # Default logic for small files (same pattern as DOCX)
-                self.logger.info(f"'{source_filename}' has {num_rows} rows. Extracting all content.")
-
-                # Extract header
-                if all_rows:
-                    full_text_parts.append("HEADERS: " + " | ".join(all_rows[0]))
-
-                # Extract all data rows
-                for i, row in enumerate(all_rows[1:], 1):
-                    row_text = " | ".join(str(cell) for cell in row)
-                    if row_text.strip():
-                        full_text_parts.append(f"Row {i}: {row_text}")
-
-            # Combine all text into a single string (same as other extractors)
-            full_content = "\n".join(full_text_parts)
-
-            self.logger.info(f"Extraction of '{source_filename}' completed successfully.")
+                # Content is too large, sample the text
+                sampled_text = self._sample_text(lines)
 
             return ExtractionResult(
                 source_file=source_filename,
-                content=full_content,
+                content=sampled_text,
                 success=True
             )
 
-        except UnicodeDecodeError:
-            # Try different encoding
-            try:
-                with open(csv_path, 'r', encoding='latin-1', newline='') as file:
-                    reader = csv.reader(file)
-                    all_rows = list(reader)
-                # Process same as above...
-                return self.extract(input_path)  # Retry with latin-1
-            except Exception as e:
-                return self._create_error_result(source_filename, f"Encoding error: {e}")
-
         except Exception as e:
-            return self._create_error_result(source_filename, f"Error processing file: {e}")
+            return self._create_error_result(source_filename, str(e))
 
-    def _create_error_result(self, source_file: str, error_message: str) -> ExtractionResult:
-        """Creates a standardized error result."""
-        self.logger.error(f"Error in file '{source_file}': {error_message}")
-        return ExtractionResult(
-            source_file=source_file,
-            content=None,
-            success=False,
-            error_message=error_message
-        )
+    def _sample_text(self, lines: list[str]) -> str:
+        """
+        Extract text content from CSV files with streamlined character-based processing.
+
+        Args:
+            lines (List[str]): Complete list of processed text lines from CSV
+
+        Returns:
+            str: Sampled content with clear boundary preservation and sampling indicator.
+                Total character count will not exceed MAX_TOTAL_CHARACTERS.
+
+
+        """
+        half_limit = self.MAX_TOTAL_CHARACTERS // 2
+        start, end = [], []
+
+        # Collect lines from the start until half limit is reached
+        char_count = 0
+        for line in lines:
+            if char_count + len(line) > half_limit:
+                break
+            start.append(line)
+            char_count += len(line)
+
+        # Collect lines from the end until half limit is reached
+        char_count = 0
+        for line in reversed(lines):
+            if char_count + len(line) > half_limit:
+                break
+            end.insert(0, line)
+            char_count += len(line)
+
+        # Combine start and end with ellipsis in the middle
+        return "\n".join(start + ["..."] + end)

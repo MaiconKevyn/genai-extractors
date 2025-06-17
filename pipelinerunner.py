@@ -269,42 +269,6 @@ def main():
     logging.info("🎉 Processamento concluído!")
     logging.info(f"📂 Resultados salvos em: {output_dir}")
 
-    logging.info(f"\n📊 Relatório Final:")
-    logging.info(f"   ✅ Sucessos: {len(results['success'])}")
-    logging.info(f"   ❌ Falhas: {len(results['failed'])}")
-    logging.info(f"   ⏱️  Tempo total: {results['total_time']:.2f}s")
-    logging.info(f"   📈 Taxa de sucesso: {len(results['success']) / len(supported_files):.1%}")
-
-    if results['success']:
-        logging.info(f"\n✅ Arquivos processados com sucesso:")
-        for filename in results['success']:
-            logging.info(f"      • {filename}")
-
-    if results['failed']:
-        logging.info(f"\n❌ Arquivos com falha:")
-        for filename in results['failed']:
-            logging.info(f"      • {filename}")
-
-    # ✅ Análise de qualidade do conteúdo extraído
-    if results['success']:
-        analyze_extracted_content(output_dir)
-
-    # ✅ Dicas para melhorar resultados
-    if results['failed'] or not ocr_available:
-        logging.info(f"\n💡 Dicas para melhorar resultados:")
-
-        if results['failed']:
-            logging.info(f"   • Verifique se arquivos não estão corrompidos")
-            logging.info(f"   • Verifique logs detalhados acima para erros específicos")
-
-        if not ocr_available:
-            logging.info(f"   • Para melhorar documentos escaneados, instale Tesseract OCR:")
-            logging.info(f"     - Ubuntu: sudo apt install tesseract-ocr tesseract-ocr-eng tesseract-ocr-por")
-            logging.info(f"     - Python: pip install pytesseract")
-            logging.info(f"   • Após instalar OCR, execute novamente para melhorar qualidade")
-
-    return len(results['success']) > 0
-
 
 if __name__ == "__main__":
     try:

@@ -1,143 +1,162 @@
-import openpyxl
-import logging
+"""
+Microsoft Excel Data Extraction Module
+
+This module provides specialized text extraction capabilities for Microsoft Excel
+files (.xlsx, .xlsm, .xls formats).
+
+Classes:
+    XLSXTextExtractor: Main class for Excel text extraction with multi-sheet support
+
+"""
+
+import openpyxl  # For .xlsx, .xlsm
+import xlrd      # For .xls
 from pathlib import Path
 from typing import Union
 
-# Imports the base class and unified result
 from .base_extractor import BaseExtractor, ExtractionResult
 
 
-class XlsxExtractor(BaseExtractor):
-    """Extracts text from .xlsx files, with sampling for large files based on rows."""
+class XLSXTextExtractor(BaseExtractor):
+    """
+    This class provides a streamlined, format-agnostic approach to extracting text
+    content from Microsoft Excel workbooks across all major format versions. It
+    automatically selects the optimal processing library based on file format and
+    applies consistent character-based sampling for predictable performance
+    characteristics regardless of the underlying Excel format or complexity.
+
+    Attributes:
+        MAX_TOTAL_CHARACTERS (int): Character limit for content extraction.
+            Workbooks exceeding this limit will be intelligently sampled to maintain
+            consistent output size and processing performance across all formats.
+
+    """
+
+    MAX_TOTAL_CHARACTERS = 30000  # Limit text to ~10 pages
 
     def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        # Constants for sampling logic (same pattern as CSV)
-        self.ROW_LIMIT_FOR_SAMPLING = 1000  # Same as CSV
-        self.ROWS_TO_SAMPLE = 500  # Same as CSV
+        super().__init__()
 
     def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
         """
-        Extracts text from a .xlsx. If the file has more than 1000 rows,
-        extracts only the first 500 and the last 500 from each sheet.
+       Extract text content from Excel workbooks with universal format support. (.xlsx, .xlsm, .xls)
+
+        This method implements an optimized extraction workflow that automatically
+        detects Excel format versions and selects the appropriate processing library
+        for optimal performance. It uses character-based sampling to ensure
+        predictable processing times and output sizes across all supported formats.
+
+        Args:
+            input_path (Union[str, Path]): Path to the Excel workbook to process.
+                Accepts both string paths and Path objects for maximum flexibility.
+                Must point to an existing, readable Excel file (.xlsx, .xlsm, or .xls).
+
+        Returns:
+            ExtractionResult: Universal result object containing:
+                - source_file: Original filename for tracking and audit
+                - content: Extracted text with consistent sizing (None if failed)
+                - success: Boolean extraction status indicator
+                - error_message: Detailed error information if extraction failed
+
+        Raises:
+            No exceptions are raised. All errors are caught and returned
+            as failed ExtractionResult objects with descriptive error messages.
+
         """
-        xlsx_path = Path(input_path)
-        source_filename = xlsx_path.name
+        excel_path = Path(input_path)
+        source_filename = excel_path.name
 
-        if not xlsx_path.exists():
-            return self._create_error_result(source_filename, f"File not found: {xlsx_path}")
+        if not excel_path.exists():
+            return self._create_error_result(source_filename, f"File not found: {excel_path}")
 
-        if xlsx_path.suffix.lower() not in ['.xlsx', '.xlsm']:
-            return self._create_error_result(source_filename, f"File is not a .xlsx/.xlsm: {xlsx_path.suffix}")
+        suffix = excel_path.suffix.lower()
+        if suffix not in ['.xlsx', '.xls', '.xlsm']:
+            return self._create_error_result(source_filename, f"Unsupported Excel file type: {suffix}")
 
+        # Determine the extraction method based on file type
         try:
-            # Open Excel file
-            workbook = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
-            sheet_names = workbook.sheetnames
+            if suffix == '.xls':
+                lines = self._extract_xls(excel_path)
+            else:
+                lines = self._extract_xlsx(excel_path)
 
-            if not sheet_names:
-                return self._create_error_result(source_filename, "XLSX file has no sheets")
+            full_text = "\n".join(lines)
 
-            all_sheets_text = []
-
-            # Process each sheet (similar to processing multiple tables in DOCX)
-            for sheet_name in sheet_names:
-                try:
-                    sheet = workbook[sheet_name]
-                    sheet_text = self._extract_sheet_text(sheet, sheet_name, source_filename)
-                    if sheet_text.strip():
-                        all_sheets_text.append(f"=== SHEET: {sheet_name} ===\n{sheet_text}")
-                except Exception as e:
-                    self.logger.warning(f"Error processing sheet '{sheet_name}' in '{source_filename}': {e}")
-                    continue
-
-            workbook.close()
-
-            # Combine all sheets (same pattern as combining text parts)
-            full_content = "\n\n".join(all_sheets_text)
-
-            if not full_content.strip():
-                return self._create_error_result(source_filename, "No content extracted from XLSX file")
-
-            self.logger.info(f"Extraction of '{source_filename}' completed successfully.")
+            if len(full_text) <= self.MAX_TOTAL_CHARACTERS:
+                sampled_text = full_text
+            else:
+                sampled_text = self._sample_text(lines)
 
             return ExtractionResult(
                 source_file=source_filename,
-                content=full_content,
+                content=sampled_text,
                 success=True
             )
 
         except Exception as e:
-            return self._create_error_result(source_filename, f"Error processing file: {e}")
+            return self._create_error_result(source_filename, str(e))
 
-    def _extract_sheet_text(self, sheet, sheet_name: str, source_filename: str) -> str:
-        """Extract text from a single sheet with sampling logic."""
-        # Get all rows with data
-        all_rows = []
-        for row in sheet.iter_rows(values_only=True):
-            # Skip completely empty rows
-            if any(cell is not None and str(cell).strip() for cell in row):
-                all_rows.append(row)
+    def _extract_xlsx(self, path: Path) -> list[str]:
+        """Extracts content from .xlsx/.xlsm using openpyxl."""
+        wb = openpyxl.load_workbook(path, read_only=True)
+        lines = []
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows(values_only=True):
+                line = ' '.join(str(cell) for cell in row if cell is not None).strip()
+                if line:
+                    lines.append(line)
+        return lines
 
-        num_rows = len(all_rows)
+    def _extract_xls(self, path: Path) -> list[str]:
+        """
+        Extracts content from .xls using xlrd.
 
-        if num_rows == 0:
-            return ""
+        Args:
+            path (Path): Path to the .xlsx or .xlsm file
 
-        full_text_parts = []
+        Returns:
+            List[str]: List of processed text lines from all sheets"""
+        wb = xlrd.open_workbook(path)
+        lines = []
+        for sheet in wb.sheets():
+            for row_idx in range(sheet.nrows):
+                row = sheet.row_values(row_idx)
+                line = ' '.join(str(cell) for cell in row if cell != "").strip()
+                if line:
+                    lines.append(line)
+        return lines
 
-        # Sampling logic for large sheets (same pattern as CSV/DOCX)
-        if num_rows > self.ROW_LIMIT_FOR_SAMPLING:
-            self.logger.info(
-                f"Sheet '{sheet_name}' in '{source_filename}' has {num_rows} rows. "
-                f"Sampling the first {self.ROWS_TO_SAMPLE} and the last {self.ROWS_TO_SAMPLE}."
-            )
+    def _sample_text(self, lines: list[str]) -> str:
+        """
+        Returns sampled text (start and end) if content is too large.
 
-            # Extract header (first row)
-            if all_rows:
-                header_row = " | ".join(str(cell) if cell is not None else "" for cell in all_rows[0])
-                full_text_parts.append(f"HEADERS: {header_row}")
+        Args:
+            lines (List[str]): Complete list of processed text lines from all sheets
 
-            # Extract first rows
-            for i in range(1, min(self.ROWS_TO_SAMPLE + 1, len(all_rows))):
-                row_text = " | ".join(str(cell) if cell is not None else "" for cell in all_rows[i])
-                if row_text.strip():
-                    full_text_parts.append(f"Row {i}: {row_text}")
+        Returns:
+            str: Sampled content with clear boundary preservation and sampling indicator.
+                Total character count will not exceed MAX_TOTAL_CHARACTERS.
 
-            # Add separator
-            full_text_parts.append("... (content of intermediate rows omitted) ...")
+        """
+        # Limit the total characters to half the maximum limit
+        half_limit = self.MAX_TOTAL_CHARACTERS // 2
+        start, end = [], []
 
-            # Extract last rows
-            start_last_rows = max(1, num_rows - self.ROWS_TO_SAMPLE)
-            for i in range(start_last_rows, num_rows):
-                row_text = " | ".join(str(cell) if cell is not None else "" for cell in all_rows[i])
-                if row_text.strip():
-                    full_text_parts.append(f"Row {i}: {row_text}")
+        # Collect lines from the start until half  limit is reached
+        char_count = 0
+        for line in lines:
+            if char_count + len(line) > half_limit:
+                break
+            start.append(line)
+            char_count += len(line)
 
-        else:
-            # Default logic for small sheets (same pattern as others)
-            self.logger.info(
-                f"Sheet '{sheet_name}' in '{source_filename}' has {num_rows} rows. Extracting all content.")
+        # Collect lines from the end until half limit is reached
+        char_count = 0
+        for line in reversed(lines):
+            if char_count + len(line) > half_limit:
+                break
+            end.insert(0, line)
+            char_count += len(line)
 
-            # Extract header
-            if all_rows:
-                header_row = " | ".join(str(cell) if cell is not None else "" for cell in all_rows[0])
-                full_text_parts.append(f"HEADERS: {header_row}")
-
-            # Extract all data rows
-            for i, row in enumerate(all_rows[1:], 1):
-                row_text = " | ".join(str(cell) if cell is not None else "" for cell in row)
-                if row_text.strip():
-                    full_text_parts.append(f"Row {i}: {row_text}")
-
-        return "\n".join(full_text_parts)
-
-    def _create_error_result(self, source_file: str, error_message: str) -> ExtractionResult:
-        """Creates a standardized error result."""
-        self.logger.error(f"Error in file '{source_file}': {error_message}")
-        return ExtractionResult(
-            source_file=source_file,
-            content=None,
-            success=False,
-            error_message=error_message
-        )
+        # Combine start and end with an ellipsis in the middle
+        return "\n".join(start + ["..."] + end)
