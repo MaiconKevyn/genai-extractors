@@ -101,7 +101,7 @@ class FileTypeManager:
 
         extension = extension.lower()
         self._extractors[extension] = extractor_class
-        self.logger.info(f"📝 Registered {extractor_class.__name__} for {extension}")
+        self.logger.info(f"Registered {extractor_class.__name__} for {extension}")
 
     def _create_extractor(self, file_path: Path) -> Optional[BaseExtractor]:
         """
@@ -125,7 +125,8 @@ class FileTypeManager:
             self.logger.error(f"❌ Error creating {extractor_class.__name__}: {e}")
             return None
 
-    def process_file(self, input_path: Union[str, Path], output_dir: Union[str, Path]) -> bool:
+    def process_file(self, input_path: Union[str, Path], output_dir: Union[str, Path],
+                     preserve_structure: bool = True) -> bool:
         """
         Process document file and save extraction result.
 
@@ -156,8 +157,38 @@ class FileTypeManager:
 
             self.logger.info(f"Processing '{input_path.name}' with '{extractor.__class__.__name__}'")
 
-            # Extract content and save to output directory
-            output_path = Path(output_dir) / (input_path.stem + '.json')
+            # CORREÇÃO: Determinar output_path baseado na estrutura
+            if preserve_structure:
+                # Tentar preservar estrutura de pastas
+                # Assumir que input_path tem formato: .../raw/DOMAIN/CATEGORY/file.ext
+                parts = input_path.parts
+
+                # Procurar por 'raw' nas partes do caminho
+                raw_index = None
+                for i, part in enumerate(parts):
+                    if part == 'raw':
+                        raw_index = i
+                        break
+
+                if raw_index is not None and len(parts) > raw_index + 3:
+                    # Extrair domain/category da estrutura
+                    domain = parts[raw_index + 1]
+                    category = parts[raw_index + 2]
+
+                    # Criar estrutura de output preservando hierarquia
+                    output_subdir = Path(output_dir) / domain / category
+                    output_subdir.mkdir(parents=True, exist_ok=True)
+                    output_path = output_subdir / (input_path.stem + '.json')
+
+                    self.logger.info(f"Preserving structure: {domain}/{category}")
+                else:
+                    # Fallback: salvar na raiz
+                    output_path = Path(output_dir) / (input_path.stem + '.json')
+                    self.logger.warning(f"Could not detect folder structure, saving to root")
+            else:
+                # Estrutura simples - salvar na raiz do output_dir
+                output_path = Path(output_dir) / (input_path.stem + '.json')
+
             return extractor.extract_and_save(input_path, output_path)
 
         except Exception as e:

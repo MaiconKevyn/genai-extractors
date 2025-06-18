@@ -1,12 +1,3 @@
-"""
-Document Extraction System Configuration Module
-
-This module provides configuration settings and directory setup for the document extraction system.
-
-Classes:
-    ExtractorConfig: Configuration dataclass for extraction parameters
-"""
-
 from pathlib import Path
 from dataclasses import dataclass
 from typing import List

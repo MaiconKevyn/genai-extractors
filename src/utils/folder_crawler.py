@@ -1,14 +1,15 @@
 """
-Folder Crawler for Document Classification
+Simplified Folder Creator
 
-Simple script to create folder structure and discover documents
-based on src/utils/supported_domain_and_category.json configuration.
+Creates folder structure for raw and extracted directories
+based on domain_and_class_structure.json configuration.
+Only creates new folders if they don't exist.
 """
 
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_project_root() -> Path:
-    """Get project root directory (genai-extractors/)."""
+    """Get project root directory."""
     # This file is in src/utils/, so project root is 2 levels up
     return Path(__file__).parent.parent.parent
 
@@ -35,15 +36,19 @@ def load_config() -> Dict[str, Dict[str, str]]:
     return config
 
 
-def create_folder_structure(base_dir: Path, config: Dict[str, Dict[str, str]]) -> None:
+def create_folder_structure(base_dir: Path, config: Dict[str, Dict[str, str]]) -> int:
     """
     Create folder structure based on configuration.
+    Only creates folders that don't exist.
 
     Args:
         base_dir: Base directory (data/raw or data/extracted)
         config: Domain and category configuration
+
+    Returns:
+        int: Number of new folders created
     """
-    logger.info(f"Creating folder structure in: {base_dir}")
+    logger.info(f"Checking folder structure in: {base_dir}")
 
     # Ensure base directory exists
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -51,24 +56,31 @@ def create_folder_structure(base_dir: Path, config: Dict[str, Dict[str, str]]) -
     folders_created = 0
 
     for domain_name, categories in config.items():
-        # Create domain folder
+        # Create domain folder if it doesn't exist
         domain_path = base_dir / domain_name
-        domain_path.mkdir(exist_ok=True)
+        if not domain_path.exists():
+            domain_path.mkdir()
+            logger.info(f"Created domain folder: {domain_name}")
 
         for category_name in categories.keys():
-            # Create category folder
+            # Create category folder if it doesn't exist
             category_path = domain_path / category_name
-            category_path.mkdir(exist_ok=True)
-            folders_created += 1
+            if not category_path.exists():
+                category_path.mkdir()
+                folders_created += 1
+                logger.info(f"Created category folder: {domain_name}/{category_name}")
 
-            logger.debug(f"Created: {domain_name}/{category_name}")
+    if folders_created == 0:
+        logger.info("All folders already exist - no changes needed")
+    else:
+        logger.info(f"Created {folders_created} new folders in {base_dir}")
 
-    logger.info(f"Created {folders_created} category folders in {base_dir}")
+    return folders_created
 
 
 def create_all_folders() -> None:
     """Create complete folder structure for raw and extracted directories."""
-    # Get project root (genai-extractors/)
+    # Get project root
     project_root = get_project_root()
 
     # Define paths
@@ -76,214 +88,53 @@ def create_all_folders() -> None:
     extracted_dir = project_root / "data" / "extracted"
 
     logger.info(f"Project root: {project_root}")
-    logger.info(f"Raw directory: {raw_dir}")
-    logger.info(f"Extracted directory: {extracted_dir}")
 
     # Load configuration
     config = load_config()
 
-    # Create structures
-    create_folder_structure(raw_dir, config)
-    create_folder_structure(extracted_dir, config)
+    # Create structures and count new folders
+    raw_folders_created = create_folder_structure(raw_dir, config)
+    extracted_folders_created = create_folder_structure(extracted_dir, config)
 
     # Summary
     total_domains = len(config)
     total_categories = sum(len(categories) for categories in config.values())
+    total_created = raw_folders_created + extracted_folders_created
 
-    logger.info(f"""
-FOLDER STRUCTURE CREATED:
+    if total_created > 0:
+        logger.info(f"""
+NEW FOLDERS CREATED:
+   • Raw folders: {raw_folders_created}
+   • Extracted folders: {extracted_folders_created}
+   • Total new folders: {total_created}
+
+CURRENT STRUCTURE:
    • {total_domains} domains
-   • {total_categories} categories  
-   • {total_categories * 2} total folders created (raw + extracted)
-
-STRUCTURE:
+   • {total_categories} categories per directory
    • Raw documents: {raw_dir}
    • Processed results: {extracted_dir}
-
-NEXT STEPS:
-   1. Place documents in data/raw/DOMAIN/CATEGORY/ folders
-   2. Run document classification system
+""")
+    else:
+        logger.info(f"""
+FOLDER STRUCTURE UP TO DATE:
+   • {total_domains} domains
+   • {total_categories} categories
+   • No new folders needed
 """)
 
 
-def discover_documents(raw_dir: Path = None) -> List[Tuple[str, str, Path]]:
-    """
-    Discover all documents in the folder structure.
-
-    Args:
-        raw_dir: Raw directory path (defaults to data/raw)
-
-    Returns:
-        List of tuples: (domain, category, file_path)
-    """
-    if raw_dir is None:
-        project_root = get_project_root()
-        raw_dir = project_root / "data" / "raw"
-
-    if not raw_dir.exists():
-        logger.warning(f"Raw directory doesn't exist: {raw_dir}")
-        return []
-
-    # Load config to validate structure
-    config = load_config()
-
-    # Supported file extensions
-    supported_extensions = {'.pdf', '.docx', '.xlsx', '.csv', '.xls'}
-
-    documents = []
-
-    # Crawl each domain
-    for domain_name in config.keys():
-        domain_path = raw_dir / domain_name
-
-        if not domain_path.exists():
-            logger.warning(f"Domain folder not found: {domain_path}")
-            continue
-
-        # Crawl each category
-        for category_name in config[domain_name].keys():
-            category_path = domain_path / category_name
-
-            if not category_path.exists():
-                logger.warning(f"Category folder not found: {category_path}")
-                continue
-
-            # Find documents in category
-            for file_path in category_path.iterdir():
-                if (file_path.is_file() and
-                        file_path.suffix.lower() in supported_extensions):
-                    documents.append((domain_name, category_name, file_path))
-                    logger.debug(f"Found: {domain_name}/{category_name}/{file_path.name}")
-
-    logger.info(f"Discovered {len(documents)} documents")
-    return documents
-
-
-def show_statistics(documents: List[Tuple[str, str, Path]]) -> None:
-    """Show statistics about discovered documents."""
-    if not documents:
-        logger.info("No documents found")
-        return
-
-    # Count by domain
-    domain_counts = {}
-    # Count by extension
-    extension_counts = {}
-
-    for domain, category, file_path in documents:
-        # Domain counts
-        domain_counts[domain] = domain_counts.get(domain, 0) + 1
-
-        # Extension counts
-        ext = file_path.suffix.lower()
-        extension_counts[ext] = extension_counts.get(ext, 0) + 1
-
-    logger.info(f"""
-DOCUMENT STATISTICS:
-   • Total documents: {len(documents)}
-   • Total domains with documents: {len(domain_counts)}
-
-BY DOMAIN:""")
-
-    for domain, count in sorted(domain_counts.items()):
-        logger.info(f"   • {domain}: {count} documents")
-
-    logger.info(f"""
-BY FILE TYPE:""")
-    for ext, count in sorted(extension_counts.items()):
-        logger.info(f"   • {ext}: {count} files")
-
-
-def validate_structure(raw_dir: Path = None) -> bool:
-    """
-    Validate that folder structure matches configuration.
-
-    Returns:
-        True if structure is valid, False otherwise
-    """
-    if raw_dir is None:
-        project_root = get_project_root()
-        raw_dir = project_root / "data" / "raw"
-
-    config = load_config()
-    errors = []
-
-    if not raw_dir.exists():
-        errors.append(f"Raw directory doesn't exist: {raw_dir}")
-        return False
-
-    # Check each domain and category
-    for domain_name, categories in config.items():
-        domain_path = raw_dir / domain_name
-
-        if not domain_path.exists():
-            errors.append(f"Missing domain folder: {domain_name}")
-            continue
-
-        for category_name in categories.keys():
-            category_path = domain_path / category_name
-
-            if not category_path.exists():
-                errors.append(f"Missing category folder: {domain_name}/{category_name}")
-
-    if errors:
-        logger.error(f"Structure validation failed:")
-        for error in errors:
-            logger.error(f"   • {error}")
-        return False
-    else:
-        logger.info("Folder structure is valid")
-        return True
-
-
-# Command-line interface
-def main():
-    """Main function for command-line usage."""
+if __name__ == "__main__":
+    """Simple command-line interface - only supports create."""
     import sys
 
-    if len(sys.argv) < 2:
-        print("""
-Usage: python src/utils/folder_crawler.py <command>
-
-Commands:
-  create    - Create folder structure from configuration
-  discover  - Discover documents in existing structure  
-  validate  - Validate folder structure
-  stats     - Show document statistics
-        """)
-        return
-
-    command = sys.argv[1].lower()
+    if len(sys.argv) > 1 and sys.argv[1].lower() != "create":
+        print(f"Unknown command: {sys.argv[1]}")
+        print("Usage: python src/utils/folder_crawler.py [create]")
+        print("Note: 'create' is the default action")
+        sys.exit(1)
 
     try:
-        if command == "create":
-            create_all_folders()
-
-        elif command == "discover":
-            documents = discover_documents()
-            if documents:
-                logger.info(f"Found {len(documents)} documents:")
-                for domain, category, file_path in documents[:10]:  # Show first 10
-                    logger.info(f"  • {domain}/{category}/{file_path.name}")
-                if len(documents) > 10:
-                    logger.info(f"  ... and {len(documents) - 10} more")
-
-        elif command == "validate":
-            is_valid = validate_structure()
-            sys.exit(0 if is_valid else 1)
-
-        elif command == "stats":
-            documents = discover_documents()
-            show_statistics(documents)
-
-        else:
-            logger.error(f"Unknown command: {command}")
-            sys.exit(1)
-
+        create_all_folders()
     except Exception as e:
         logger.error(f"Error: {e}")
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

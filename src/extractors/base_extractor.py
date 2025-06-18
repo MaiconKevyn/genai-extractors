@@ -63,7 +63,49 @@ class BaseExtractor(ABC):
             ExtractionResult: Result containing extracted content or error info
         """
 
-    def save_as_json(self, result: ExtractionResult, output_path: Union[str, Path]) -> bool:
+    def _extract_labels_from_path(self, file_path: Path) -> Optional[dict]:
+        """
+        Extract domain and category labels from file path structure.
+
+        Args:
+            file_path: Path to the document file
+
+        Returns:
+            dict with labels or None if invalid structure
+        """
+        try:
+            # Load config
+            config_path = Path(__file__).parent.parent / "utils" / "domain_and_class_structure.json"
+            if not config_path.exists():
+                return None
+
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+
+            # Extract domain and category from path
+            parts = file_path.parts
+            if len(parts) < 3:
+                return None
+
+            category = parts[-2]  # Parent directory
+            domain = parts[-3]  # Grandparent directory
+
+            # Validate against configuration
+            if domain not in config or category not in config[domain]:
+                return None
+
+            # Return labels
+            return {
+                "domain": domain,
+                "category": category,
+            }
+
+        except Exception as e:
+            self.logger.debug(f"Could not extract labels from {file_path}: {e}")
+            return None
+
+    def save_as_json(self, result: ExtractionResult, output_path: Union[str, Path],
+                     source_path: Union[str, Path] = None) -> bool:
         """
         Save extraction result to JSON file.
 
@@ -97,6 +139,13 @@ class BaseExtractor(ABC):
                 }
             }
 
+            # Try to add labels automatically
+            if source_path:
+                labels = self._extract_labels_from_path(Path(source_path))
+                if labels:
+                    data_to_save["extraction_info"]["labels"] = labels
+                    self.logger.info(f"Added labels: {labels['domain']}/{labels['category']}")
+
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(data_to_save, f, ensure_ascii=False, indent=2)
 
@@ -118,12 +167,13 @@ class BaseExtractor(ABC):
         Returns:
             bool: True if extraction and save completed successfully
         """
+        input_path = Path(input_path)
         self.logger.info(f"Starting extraction: {Path(input_path).name}")
 
         result = self.extract(input_path)
 
         if result.success:
-            return self.save_as_json(result, output_path)
+            return self.save_as_json(result, output_path, source_path=input_path)
         else:
             self.logger.error(f"Extraction failed: {result.error_message}")
             return False
