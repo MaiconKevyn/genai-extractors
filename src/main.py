@@ -1,8 +1,8 @@
 """
-Document Extraction System Main Application
+Document Classification System
 
-This module implements the main interface for document extraction operations.
-Uses the existing architecture (FileTypeManager + Extractors) in a direct and efficient manner.
+This system classifies documents using LLM analysis. Supports multiple document formats
+and provides classification metrics and results tracking.
 """
 
 import logging
@@ -15,12 +15,7 @@ logging.basicConfig(
 )
 
 def setup_directories():
-    """
-    Configure input and output directories using project settings.
-
-    Returns:
-        tuple: (input_dir, output_dir) as Path objects
-    """
+    """Setup input, output, and results directories."""
     from config.settings import INPUT_DIR, OUTPUT_DIR
 
     # Ensure directories exist
@@ -92,16 +87,6 @@ def process_documents(files, manager, output_dir):
 
 
 def main():
-    """
-    Main application function.
-
-    Coordinates the complete extraction workflow:
-    1. Configure directories
-    2. Initialize file manager
-    3. Identify files to process
-    4. Execute extraction
-    5. Display results
-    """
     logging.info("Starting Document Extraction System")
 
     try:

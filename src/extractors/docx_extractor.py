@@ -1,11 +1,11 @@
 """
 Document Text Extraction Module
 
-This module provides specialized text extraction capabilities for Microsoft Word
-documents (.docx format) using the python-docx library.
+This module provides text extraction for Microsoft Word documents (.docx format)
+using the python-docx library.
 
 Classes:
-    DocxExtractor: Main class for DOCX text extraction with intelligent sampling
+    DocxExtractor: DOCX text extractor with sampling for large documents
 """
 
 import docx  # python-docx library
@@ -17,22 +17,17 @@ from .base_extractor import BaseExtractor, ExtractionResult
 
 class DocxExtractor(BaseExtractor):
     """
-    DOCX text extractor with intelligent sampling for large documents.
+    Text extractor for DOCX documents.
 
-    This class specializes in extracting text content from Microsoft Word documents
-    using the python-docx library. The extractor implements an intelligent sampling strategy for
-    large documents to maintain reasonable processing times while preserving
-    representative content from both text and tabular data.
+    Extracts text from Word documents using python-docx. For large documents
+    (>180 paragraphs), samples first and last paragraphs to limit processing time.
+    Also extracts text from tables.
 
     Attributes:
-        PARAGRAPH_LIMIT_FOR_SAMPLING (int): Threshold above which sampling is triggered.
-            Documents with more paragraphs will use sampling strategy.
-        PARAGRAPHS_TO_SAMPLE (int): Number of paragraphs to extract from beginning
-            and end when sampling is active.
+        PARAGRAPH_LIMIT_FOR_SAMPLING (int): Paragraph threshold for sampling (180)
+        PARAGRAPHS_TO_SAMPLE (int): Paragraphs to extract from start/end when sampling (90)
     """
-
     def __init__(self):
-        """Initialize the DOCX text extractor with optimized sampling configuration."""
         super().__init__()
 
         # Sampling settings for large files
@@ -41,27 +36,13 @@ class DocxExtractor(BaseExtractor):
 
     def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
         """
-        Extracts text from DOCX using python-docx.
-
-        This method orchestrates the complete DOCX text extraction workflow, including
-        file validation, format verification, content extraction from both paragraphs
-        and tables, and intelligent sampling for large documents.
+        Extract text from DOCX file including tables.
 
         Args:
-            input_path (Union[str, Path]): Path to the DOCX file to process.
-                Accepts both string paths and Path objects for maximum flexibility.
-                Must point to an existing, readable DOCX file.
+            input_path: Path to DOCX file
 
         Returns:
-            ExtractionResult: Comprehensive result object containing:
-                - source_file: Original filename for tracking and logging
-                - content: Extracted text content including tables (None if failed)
-                - success: Boolean extraction status indicator
-                - error_message: Detailed error information if extraction failed
-
-        Raises:
-            No exceptions are raised. All errors are caught and returned
-            as failed ExtractionResult objects with descriptive error messages.
+            ExtractionResult: Contains extracted text or error info
         """
         docx_path = Path(input_path)
         source_filename = docx_path.name
@@ -87,28 +68,19 @@ class DocxExtractor(BaseExtractor):
 
     def _extract_text(self, docx_path: Path, source_filename: str) -> str:
         """
-        Core text extraction logic with intelligent sampling for large documents.
+        Extract text with sampling for large documents.
 
-        This method implements the comprehensive extraction algorithm that handles
-        both paragraphs and tables while automatically choosing between full
-        extraction and sampling based on document size. The algorithm is designed
-        to maximize content fidelity while maintaining optimal performance.
+        Strategy:
+            - ≤180 paragraphs: Extract all paragraphs + tables
+            - >180 paragraphs: Extract first 90 + last 90 paragraphs only
+            - Empty paragraphs are filtered out
 
         Args:
-            docx_path (Path): Validated path to the DOCX file
-            source_filename (str): Original filename for logging and error reporting
+            docx_path: Path to DOCX file
+            source_filename: Filename for logging
 
         Returns:
-            str: Comprehensive extracted text content with proper formatting.
-                Paragraphs and table content are separated with double newlines
-                for optimal readability and structure preservation.
-
-        Raises:
-            docx.opc.exceptions.PackageNotFoundError: If DOCX format is invalid
-            PermissionError: If file access is denied
-            MemoryError: If document exceeds available memory capacity
-
-
+            str: Extracted text with paragraphs joined by double newlines
         """
         document = docx.Document(str(docx_path))
         paragraphs = document.paragraphs

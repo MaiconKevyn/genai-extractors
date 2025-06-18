@@ -1,12 +1,11 @@
 """
 CSV Data Extraction Module
 
-This module provides optimized text extraction capabilities for CSV (Comma-Separated Values)
-files with intelligent character-based sampling for large datasets.
+This module provides text extraction for CSV (Comma-Separated Values) files
+with character-based sampling for large datasets.
 
 Classes:
-    CSVTextExtractor: Streamlined class for high-performance CSV text extraction
-
+    CSVTextExtractor: CSV text extractor with sampling
 """
 
 import csv
@@ -16,44 +15,29 @@ from .base_extractor import BaseExtractor, ExtractionResult
 
 class CSVTextExtractor(BaseExtractor):
     """
-    This class provides a simplified, high-speed approach to extracting text content
-    from CSV files. It uses character-based sampling instead of complex row analysis,
-    achieving superior performance characteristics suitable for high-volume data
-    processing workflows and analytics pipelines.
+    Text extractor for CSV files.
+
+    Extracts text from CSV files by joining row cells with spaces.
+    For large files (>30,000 characters), samples first and last portions.
 
     Attributes:
-        MAX_TOTAL_CHARACTERS (int): Maximum character limit for extracted content.
-            Files exceeding this limit will be intelligently sampled to maintain
-            this size constraint while preserving content representativeness.
-
+        MAX_TOTAL_CHARACTERS (int): Character limit for extracted content (30,000)
     """
 
     MAX_TOTAL_CHARACTERS = 30000  # Approximate size limit (~10 pages)
 
     def __init__(self):
-        """ Initialize the CSV extractor configuration. """
         super().__init__()
 
     def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
         """
-        Extract text content from CSV files with streamlined character-based processing.
+        Extract text from CSV file.
 
         Args:
-            input_path (Union[str, Path]): Path to the CSV file to process.
-                Accepts both string paths and Path objects for maximum flexibility.
-                Must point to an existing, readable CSV file.
+            input_path: Path to CSV file
 
         Returns:
-            ExtractionResult: Streamlined result object containing:
-                - source_file: Original filename for tracking
-                - content: Extracted text content with consistent size (None if failed)
-                - success: Boolean extraction status
-                - error_message: Detailed error information if extraction failed
-
-        Raises:
-            No exceptions are raised. All errors are caught and returned
-            as failed ExtractionResult objects with descriptive error messages.
-
+            ExtractionResult: Contains extracted text or error info
         """
         csv_path = Path(input_path)
         source_filename = csv_path.name
@@ -90,16 +74,13 @@ class CSVTextExtractor(BaseExtractor):
 
     def _sample_text(self, lines: list[str]) -> str:
         """
-        Extract text content from CSV files with streamlined character-based processing.
+        Sample text from start and end when content exceeds limit.
 
         Args:
-            lines (List[str]): Complete list of processed text lines from CSV
+            lines: All text lines from CSV
 
         Returns:
-            str: Sampled content with clear boundary preservation and sampling indicator.
-                Total character count will not exceed MAX_TOTAL_CHARACTERS.
-
-
+            str: Sampled content with separator indicating omitted middle content
         """
         half_limit = self.MAX_TOTAL_CHARACTERS // 2
         start, end = [], []

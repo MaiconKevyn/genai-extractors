@@ -1,13 +1,11 @@
 """
 PDF Document Text Extraction Module
 
-This module provides specialized text extraction capabilities for PDF documents
-using PyMuPDF (fitz) library. It implements sampling strategies for
-large documents to balance performance with content coverage, making it suitable
-for production environments with diverse document sizes.
+This module provides text extraction for PDF documents using PyMuPDF (fitz) library.
+
 
 Classes:
-    PDFTextExtractor: Specialized extractor for PDF documents with intelligent sampling
+    PDFTextExtractor: PDF text extractor with sampling for large documents
 """
 
 import fitz  # PyMuPDF
@@ -19,46 +17,28 @@ from .base_extractor import BaseExtractor, ExtractionResult
 
 class PDFTextExtractor(BaseExtractor):
     """
-    Text extractor for PDF documents with intelligent processing strategies.
+   Text extractor for PDF documents.
 
-    This class specializes in extracting text content from PDF documents using the
-    PyMuPDF library.The extractor implements a sampling strategy for large documents to
-    maintain reasonable processing times while preserving representative content.
+    Extracts text from PDF files using PyMuPDF. For large documents (>10 pages),
+    samples first and last pages to limit processing time.
 
     Attributes:
-        PAGE_LIMIT_FOR_SAMPLING (int): Threshold above which sampling is triggered.
-            Documents with more pages will use sampling strategy.
-        PAGES_TO_SAMPLE (int): Number of pages to extract from beginning and end
-            when sampling is active.
-
+        PAGE_LIMIT_FOR_SAMPLING (int): Page threshold for sampling (10)
+        PAGES_TO_SAMPLE (int): Pages to extract from start/end when sampling (5)
     """
 
     def __init__(self):
         super().__init__()
-
         # Sampling settings for large files
         self.PAGE_LIMIT_FOR_SAMPLING = 10
         self.PAGES_TO_SAMPLE = 5
 
     def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
         """
-        Extract text content from a PDF document with intelligent processing strategy.
-
-        This method orchestrates the complete PDF text extraction workflow, including
-        file validation, format verification, and content extraction. It automatically
-        selects between full extraction and sampling based on document size.
+        Extract text from PDF file.
 
         Args:
-            input_path (Union[str, Path]): Path to the PDF file to process.
-                Accepts both string paths and Path objects for flexibility.
-                Must point to an existing, readable PDF file.
-
-        Returns:
-            ExtractionResult: Comprehensive result object containing:
-                - source_file: Original filename for tracking
-                - content: Extracted text content (None if failed)
-                - success: Boolean extraction status
-                - error_message: Detailed error info if extraction failed
+            input_path: Path to PDF file
 
         Raises:
             No exceptions are raised. All errors are caught and returned
@@ -90,15 +70,11 @@ class PDFTextExtractor(BaseExtractor):
 
     def _extract_text(self, pdf_path: Path, source_filename: str) -> str:
         """
-        Core text extraction logic with intelligent sampling for large documents.
-
-        This method implements the core extraction algorithm, automatically choosing
-        between full extraction and sampling based on document size
+        Extract text with sampling for large documents.
 
         Sampling Strategy:
             - Documents ≤ 10 pages: Full extraction of all pages
             - Documents > 10 pages: Extract first 5 + last 5 pages
-            - Content from middle pages is omitted with clear indicator
             - Empty pages are automatically filtered out
 
         Args:
@@ -107,12 +83,6 @@ class PDFTextExtractor(BaseExtractor):
 
         Returns:
             str: Extracted text content with proper page separation.
-                Pages are joined with double newlines for readability.
-
-        Raises:
-            fitz.FileDataError: If PDF format is invalid or corrupted
-            fitz.PasswordError: If PDF requires password authentication
-            MemoryError: If document is too large for available memory
         """
         doc = fitz.open(str(pdf_path))
         total_pages = len(doc)

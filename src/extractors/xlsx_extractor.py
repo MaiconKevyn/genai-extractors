@@ -19,11 +19,12 @@ from .base_extractor import BaseExtractor, ExtractionResult
 
 class XLSXTextExtractor(BaseExtractor):
     """
-    This class provides a streamlined, format-agnostic approach to extracting text
-    content from Microsoft Excel workbooks across all major format versions. It
-    automatically selects the optimal processing library based on file format and
-    applies consistent character-based sampling for predictable performance
-    characteristics regardless of the underlying Excel format or complexity.
+    Text extractor for Microsoft Excel workbooks.
+
+    Extracts text content from Excel files by choosing the appropriate library
+    based on file extension (.xls uses xlrd, others use openpyxl).
+    Applies basic character-based sampling when content exceeds the limit.
+
 
     Attributes:
         MAX_TOTAL_CHARACTERS (int): Character limit for content extraction.
@@ -41,27 +42,11 @@ class XLSXTextExtractor(BaseExtractor):
         """
        Extract text content from Excel workbooks with universal format support. (.xlsx, .xlsm, .xls)
 
-        This method implements an optimized extraction workflow that automatically
-        detects Excel format versions and selects the appropriate processing library
-        for optimal performance. It uses character-based sampling to ensure
-        predictable processing times and output sizes across all supported formats.
-
         Args:
-            input_path (Union[str, Path]): Path to the Excel workbook to process.
-                Accepts both string paths and Path objects for maximum flexibility.
-                Must point to an existing, readable Excel file (.xlsx, .xlsm, or .xls).
+            input_path: Path to Excel file
 
         Returns:
-            ExtractionResult: Universal result object containing:
-                - source_file: Original filename for tracking and audit
-                - content: Extracted text with consistent sizing (None if failed)
-                - success: Boolean extraction status indicator
-                - error_message: Detailed error information if extraction failed
-
-        Raises:
-            No exceptions are raised. All errors are caught and returned
-            as failed ExtractionResult objects with descriptive error messages.
-
+            ExtractionResult: Contains extracted text or error inf
         """
         excel_path = Path(input_path)
         source_filename = excel_path.name
@@ -115,7 +100,8 @@ class XLSXTextExtractor(BaseExtractor):
             path (Path): Path to the .xlsx or .xlsm file
 
         Returns:
-            List[str]: List of processed text lines from all sheets"""
+            List[str]: List of processed text lines from all sheets
+        """
         wb = xlrd.open_workbook(path)
         lines = []
         for sheet in wb.sheets():
@@ -135,8 +121,6 @@ class XLSXTextExtractor(BaseExtractor):
 
         Returns:
             str: Sampled content with clear boundary preservation and sampling indicator.
-                Total character count will not exceed MAX_TOTAL_CHARACTERS.
-
         """
         # Limit the total characters to half the maximum limit
         half_limit = self.MAX_TOTAL_CHARACTERS // 2

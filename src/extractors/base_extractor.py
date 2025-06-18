@@ -1,12 +1,10 @@
 """
 Base Extractor Module for Document Processing Pipeline
 
-This module provides the foundational abstract class and data structures for implementing
-document extractors in the document processing pipeline. It establishes a consistent
-interface and standardized result format across all extractor implementations.
+This module provides the base class and data structures for document extractors.
 
 Classes:
-    ExtractionResult: Data structure for standardized extraction results
+    ExtractionResult: Data structure for extraction results
     BaseExtractor: Abstract base class for all document extractors
 """
 
@@ -21,18 +19,13 @@ from abc import ABC, abstractmethod
 @dataclass
 class ExtractionResult:
     """
-    This dataclass provides a unified structure for communicating extraction
-    outcomes across the entire pipeline, ensuring consistency and enabling
-    robust error handling and result processing.
-
+    Data structure for extraction results.
 
     Attributes:
-        source_file (str): Original filename of the processed document
+        source_file (str): Original filename
         content (Optional[str]): Extracted text content, None if extraction failed
-        success (bool): Indicates whether extraction completed successfully
-        error_message (Optional[str]): Detailed error description if success=False
-        metadata (Dict[str, Any]): Additional extraction metadata (pages, size, etc.)
-
+        success (bool): Whether extraction completed successfully
+        error_message (Optional[str]): Error description if success=False
     """
     source_file: str
     content: Optional[str]
@@ -40,7 +33,6 @@ class ExtractionResult:
     error_message: Optional[str] = None
 
     def __post_init__(self):
-        """Basic data validation"""
         if self.success and not self.content:
             self.success = False
             self.error_message = "Empty content despite success status"
@@ -48,45 +40,36 @@ class ExtractionResult:
 
 class BaseExtractor(ABC):
     """
-    Abstract base class for all document extractors in the pipeline.
+    Abstract base class for all document extractors.
 
-    This class establishes the contract that all extractors must follow,
-    providing essential shared functionality for logging, file validation,
-    result persistence, and error handling. All concrete extractors should
-    inherit from this class.
+    Provides shared functionality for logging, file validation, result persistence,
+    and error handling.
 
     Abstract Methods:
         extract: Must be implemented by all concrete extractors
     """
-
     def __init__(self):
-        """Simple initialization with logger only"""
         self.logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
     def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
         """
-        Extracts content from a file.
+        Extract content from a file.
 
         Args:
-            input_path (Union[str, Path]): Path to the document file
+            input_path: Path to the document file
 
         Returns:
-            ExtractionResult: Standardized result containing extracted content
-            or error information
+            ExtractionResult: Result containing extracted content or error info
         """
 
     def save_as_json(self, result: ExtractionResult, output_path: Union[str, Path]) -> bool:
         """
-        Persist extraction result to a JSON file with standardized format.
-
-        Saves the extraction result in a consistent JSON structure that can be
-        easily processed by downstream analytics and monitoring systems. The
-        output includes both content and metadata for comprehensive tracking.
+        Save extraction result to JSON file.
 
         Args:
-            result (ExtractionResult): The extraction result to save
-            output_path (Union[str, Path]): Target file path for JSON output
+            result: The extraction result to save
+            output_path: Target file path for JSON output
 
         Returns:
             bool: True if file was saved successfully, False otherwise
@@ -126,18 +109,14 @@ class BaseExtractor(ABC):
 
     def extract_and_save(self, input_path: Union[str, Path], output_path: Union[str, Path]) -> bool:
         """
-        Execute the complete extraction pipeline: extract content and save result.
-
-        This is the main entry point for document processing, combining extraction
-        and persistence in a single operation with comprehensive error handling
-        and performance monitoring.
+        Extract content and save result to JSON.
 
         Args:
-            input_path (Union[str, Path]): Path to the input document
-            output_path (Union[str, Path]): Path for the JSON output file
+            input_path: Path to the input document
+            output_path: Path for the JSON output file
 
         Returns:
-            bool: True if the entire pipeline completed successfully
+            bool: True if extraction and save completed successfully
         """
         self.logger.info(f"Starting extraction: {Path(input_path).name}")
 
@@ -151,14 +130,14 @@ class BaseExtractor(ABC):
 
     def _create_error_result(self, source_file: str, error_message: str) -> ExtractionResult:
         """
-        Helper method to create standardized error results.
+        Create standardized error result.
 
         Args:
-            source_file (str): Name of the source file that failed
-            error_message (str): Detailed error description
+            source_file: Name of the source file that failed
+            error_message: Error description
 
         Returns:
-            ExtractionResult: Standardized error result
+            ExtractionResult: Error result
         """
         self.logger.error(f"Error in file '{source_file}': {error_message}")
         return ExtractionResult(
@@ -173,8 +152,8 @@ class BaseExtractor(ABC):
         Perform standard file validation checks.
 
         Args:
-            file_path (Path): Path to the file to validate
-            expected_extension (str): Expected file extension (e.g., '.pdf')
+            file_path: Path to the file to validate
+            expected_extension: Expected file extension (e.g., '.pdf')
 
         Returns:
             Optional[str]: None if valid, error message if invalid

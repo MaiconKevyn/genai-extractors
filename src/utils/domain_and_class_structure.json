@@ -1,0 +1,44 @@
+{
+    "TAX_AND_BANKING": 
+    {
+        "VOID_CHECK": "A check that has been canceled and cannot be cashed or deposited.",
+        "BANK_LETTER": "A letter from a bank confirming account details or other banking information.",
+        "W2_FORM": "Reports to IRS the wages paid to employees and the taxes withheld from them.",
+        "1099_FORM": "Reports to IRS various types of income other than wages, salaries, and tips payed to employees.",
+        "HSA_FORMS": "Report to IRS the Health Savings Account contributions and distributions. Include forms 5498-SA and 1099-SA.",
+        "MSA_FORMS": "Report to IRS the Medical Savings Account contributions and distributions, like HSA but typically for self-employed individuals or small businesses. Include forms 5498-SA and 1099-SA.",
+        "1095_FORMS": "Report to both client and IRS the health insurance coverage, including forms 1095-A, 1095-B, and 1095-C.",
+        "1098_FORM": "Reports to IRS the mortgage interest paid by the borrower to the lender.",
+        "W4_FORM": "Reports to employer the employee's withholding allowances for federal income tax.",
+        "1040_FORM": "An individual income tax return form used to report income, calculate taxes owed, and claim refunds.",
+        "SCHEDULE_C": "A form used by sole proprietors to report income or loss from a business they operated or a profession they practiced as a self-employed individual.",
+        "941_FORM": "A quarterly tax form used by employers to report income taxes, Social Security tax, and Medicare tax withheld from employees' paychecks.",
+        "PROOF_OF_TAX_DEPOSIT": "A document that serves as evidence of tax payments made to the IRS or other tax authorities."
+    },
+    "PAYROLL": 
+    {
+        "PAYSTUB": "A document provided to employees that outlines their earnings and deductions for a specific pay period.",
+        "PAYROLL_REGISTER": "A detailed report of all payroll transactions for a specific period, including employee earnings and deductions."
+    },
+    "CENSUS":
+    {
+        "BRET_CENSUS": "A census that includes detailed information about the workforce, such as demographics, employment status, and other relevant data."
+    },
+    "BENEFITS":
+    {
+        "ENROLMENT_GUIDE": "A document that provides information on how to enroll in various employee benefits programs.",
+        "MEDICAL": "Document related to health insurance benefits, including enrollment forms and coverage details.",
+        "DENTAL": "Document related to dental insurance benefits, including enrollment forms and coverage details.",
+        "VISION": "Document related to vision insurance benefits, including enrollment forms and coverage details.",
+        "LIFE_INSURANCE": "Document related to life insurance benefits, including enrollment forms and coverage details.",
+        "PTO_POLICY": "A document outlining the policies and procedures for paid time off, including vacation and sick leave."
+    },
+    "TIME_AND_ATTENDANCE":
+    {
+        "TIME_SHEET": "A record of the hours worked by an employee during a specific period, used for payroll processing."
+    },
+    "HUMAN_RESOURCES":
+    {
+        "I9_FORM": "A form used to verify the identity and employment authorization of individuals hired in US."
+    }
+} 
