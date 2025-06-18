@@ -10,8 +10,8 @@ Classes:
 
 import csv
 from pathlib import Path
-from typing import Union
-from .base_extractor import BaseExtractor, ExtractionResult
+from typing import Union, Optional
+from .base_extractor import BaseExtractor
 
 class CSVTextExtractor(BaseExtractor):
     """
@@ -29,7 +29,7 @@ class CSVTextExtractor(BaseExtractor):
     def __init__(self):
         super().__init__()
 
-    def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
+    def extract(self, input_path: Union[str, Path]) -> Optional[str]:
         """
         Extract text from CSV file.
 
@@ -37,16 +37,16 @@ class CSVTextExtractor(BaseExtractor):
             input_path: Path to CSV file
 
         Returns:
-            ExtractionResult: Contains extracted text or error info
+            Optional[str]: Extracted text content if successful, None if extraction failed.
         """
         csv_path = Path(input_path)
         source_filename = csv_path.name
 
-        if not csv_path.exists():
-            return self._create_error_result(source_filename, f"File not found: {csv_path}")
-
-        if csv_path.suffix.lower() != '.csv':
-            return self._create_error_result(source_filename, f"File is not CSV: {csv_path.suffix}")
+        # Validate file using inherited method
+        validation_error = self._validate_file(csv_path, '.csv')
+        if validation_error:
+            self.logger.error(f"CSV validation failed for '{source_filename}': {validation_error}")
+            return None
 
         try:
             with open(csv_path, 'r', encoding='utf-8') as f:
@@ -59,18 +59,19 @@ class CSVTextExtractor(BaseExtractor):
             if len(full_text) <= self.MAX_TOTAL_CHARACTERS:
                 # No sampling needed, return full text
                 sampled_text = full_text
+                self.logger.info(f"'{source_filename}' extracted in full ({len(full_text)} characters)")
+
             else:
                 # Content is too large, sample the text
                 sampled_text = self._sample_text(lines)
+                self.logger.info(f"'{source_filename}' sampled due to size ({len(sampled_text)} characters)")
 
-            return ExtractionResult(
-                source_file=source_filename,
-                content=sampled_text,
-                success=True
-            )
+            return sampled_text
+
 
         except Exception as e:
-            return self._create_error_result(source_filename, str(e))
+            self.logger.error(f"CSV extraction failed for '{source_filename}': {e}")
+            return None
 
     def _sample_text(self, lines: list[str]) -> str:
         """

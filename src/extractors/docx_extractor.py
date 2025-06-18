@@ -8,11 +8,11 @@ Classes:
     DocxExtractor: DOCX text extractor with sampling for large documents
 """
 
-import docx  # python-docx library
+import docx
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 
-from .base_extractor import BaseExtractor, ExtractionResult
+from .base_extractor import BaseExtractor
 
 
 class DocxExtractor(BaseExtractor):
@@ -34,7 +34,7 @@ class DocxExtractor(BaseExtractor):
         self.PARAGRAPH_LIMIT_FOR_SAMPLING = 180
         self.PARAGRAPHS_TO_SAMPLE = 90
 
-    def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
+    def extract(self, input_path: Union[str, Path]) -> Optional[str]:
         """
         Extract text from DOCX file including tables.
 
@@ -42,29 +42,25 @@ class DocxExtractor(BaseExtractor):
             input_path: Path to DOCX file
 
         Returns:
-            ExtractionResult: Contains extracted text or error info
+            Optional[str]: Extracted text content if successful, None if extraction failed.
         """
         docx_path = Path(input_path)
         source_filename = docx_path.name
 
-        # Basic validations
-        if not docx_path.exists():
-            return self._create_error_result(source_filename, f"File not found: {docx_path}")
-
-        if docx_path.suffix.lower() != '.docx':
-            return self._create_error_result(source_filename, f"File is not DOCX: {docx_path.suffix}")
+        # Validate file using inherited method
+        validation_error = self._validate_file(docx_path, '.docx')
+        if validation_error:
+            self.logger.error(f"DOCX validation failed for '{source_filename}': {validation_error}")
+            return None
 
         try:
+            # Extract text using internal method
             extracted_text = self._extract_text(docx_path, source_filename)
-
-            return ExtractionResult(
-                source_file=source_filename,
-                content=extracted_text,
-                success=True
-            )
+            return extracted_text
 
         except Exception as e:
-            return self._create_error_result(source_filename, str(e))
+            self.logger.error(f"DOCX extraction failed for '{source_filename}': {e}")
+            return None
 
     def _extract_text(self, docx_path: Path, source_filename: str) -> str:
         """

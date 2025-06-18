@@ -1,8 +1,0 @@
-{
-  "source_file": "industry.xls",
-  "content": "Industry\nAccounting/Finance\nAdvertising/Public Relations\nAerospace/Aviation\nArts/Entertainment/Publishing\nAutomotive\nBanking/Mortgage\nBusiness Development\nBusiness Opportunity\nClerical/Administrative\nConstruction/Facilities\nConsumer Goods\nCustomer Service\nEducation/Training\nEnergy/Utilities\nEngineering\nGovernment/Military\nGreen\nHealthcare\nHospitality/Travel\nHuman Resources\nInstallation/Maintenance\nInsurance\nInternet\nJob Search Aids\nLaw Enforcement/Security\nLegal\nManagement/Executive\nManufacturing/Operations\nMarketing\nNon-Profit/Volunteer\nPharmaceutical/Biotech\nProfessional Services\nQA/Quality Control\nReal Estate\nRestaurant/Food Service\nRetail\nSales\nScience/Research\nSkilled Labor\nTechnology\nTelecommunications\nTransportation/Logistics\nOther",
-  "extraction_info": {
-    "success": true,
-    "content_length": 748
-  }
-}

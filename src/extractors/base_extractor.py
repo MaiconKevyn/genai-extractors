@@ -1,42 +1,9 @@
-"""
-Base Extractor Module for Document Processing Pipeline
-
-This module provides the base class and data structures for document extractors.
-
-Classes:
-    ExtractionResult: Data structure for extraction results
-    BaseExtractor: Abstract base class for all document extractors
-"""
-
 import json
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, Optional
 from abc import ABC, abstractmethod
-
-
-@dataclass
-class ExtractionResult:
-    """
-    Data structure for extraction results.
-
-    Attributes:
-        source_file (str): Original filename
-        content (Optional[str]): Extracted text content, None if extraction failed
-        success (bool): Whether extraction completed successfully
-        error_message (Optional[str]): Error description if success=False
-    """
-    source_file: str
-    content: Optional[str]
-    success: bool
-    error_message: Optional[str] = None
-
-    def __post_init__(self):
-        if self.success and not self.content:
-            self.success = False
-            self.error_message = "Empty content despite success status"
-
+from config.settings import get_config_path
 
 class BaseExtractor(ABC):
     """
@@ -52,7 +19,7 @@ class BaseExtractor(ABC):
         self.logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
-    def extract(self, input_path: Union[str, Path]) -> ExtractionResult:
+    def extract(self, input_path: Union[str, Path]) -> Optional[str]:
         """
         Extract content from a file.
 
@@ -60,7 +27,7 @@ class BaseExtractor(ABC):
             input_path: Path to the document file
 
         Returns:
-            ExtractionResult: Result containing extracted content or error info
+            Optional[str]: Extracted text content if successful, None if extraction failed.
         """
 
     def _extract_labels_from_path(self, file_path: Path) -> Optional[dict]:
@@ -75,7 +42,7 @@ class BaseExtractor(ABC):
         """
         try:
             # Load config
-            config_path = Path(__file__).parent.parent / "utils" / "domain_and_class_structure.json"
+            config_path = get_config_path
             if not config_path.exists():
                 return None
 
@@ -104,7 +71,7 @@ class BaseExtractor(ABC):
             self.logger.debug(f"Could not extract labels from {file_path}: {e}")
             return None
 
-    def save_as_json(self, result: ExtractionResult, output_path: Union[str, Path],
+    def save_as_json(self, content: str, source_filename: str, output_path: Union[str, Path],
                      source_path: Union[str, Path] = None) -> bool:
         """
         Save extraction result to JSON file.
@@ -118,38 +85,32 @@ class BaseExtractor(ABC):
         """
         output_path = Path(output_path)
 
-        if not result.success:
-            self.logger.error(
-                f"Cannot save result with error for '{result.source_file}'. "
-                f"Reason: {result.error_message}"
-            )
-            return False
-
         try:
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Simple and clean JSON structure
+            # Build JSON structure
             data_to_save = {
-                "source_file": result.source_file,
-                "content": result.content,
+                "source_file": source_filename,
+                "content": content,
                 "extraction_info": {
-                    "success": result.success,
-                    "content_length": len(result.content) if result.content else 0
+                    "success": True,
+                    "content_length": len(content)
                 }
             }
 
-            # Try to add labels automatically
+            # Add labels if available
             if source_path:
                 labels = self._extract_labels_from_path(Path(source_path))
                 if labels:
                     data_to_save["extraction_info"]["labels"] = labels
                     self.logger.info(f"Added labels: {labels['domain']}/{labels['category']}")
 
+            # Save to JSON
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(data_to_save, f, ensure_ascii=False, indent=2)
 
-            self.logger.info(f"Result saved: {output_path} ({len(result.content)} characters)")
+            self.logger.info(f"Result saved: {output_path} ({len(content)} characters)")
             return True
 
         except Exception as e:
@@ -170,32 +131,15 @@ class BaseExtractor(ABC):
         input_path = Path(input_path)
         self.logger.info(f"Starting extraction: {Path(input_path).name}")
 
-        result = self.extract(input_path)
+        content = self.extract(input_path)
 
-        if result.success:
-            return self.save_as_json(result, output_path, source_path=input_path)
+        if content is not None:
+            # If successfully extracted, save it
+            return self.save_as_json(content, input_path.name, output_path, source_path=input_path)
         else:
-            self.logger.error(f"Extraction failed: {result.error_message}")
+            # If failed, the error was already logged in extract()
+            self.logger.error(f"Extraction failed for: {input_path.name}")
             return False
-
-    def _create_error_result(self, source_file: str, error_message: str) -> ExtractionResult:
-        """
-        Create standardized error result.
-
-        Args:
-            source_file: Name of the source file that failed
-            error_message: Error description
-
-        Returns:
-            ExtractionResult: Error result
-        """
-        self.logger.error(f"Error in file '{source_file}': {error_message}")
-        return ExtractionResult(
-            source_file=source_file,
-            content=None,
-            success=False,
-            error_message=error_message
-        )
 
     def _validate_file(self, file_path: Path, expected_extension: str) -> Optional[str]:
         """
@@ -218,4 +162,3 @@ class BaseExtractor(ABC):
             return f"File is empty: {file_path}"
 
         return None
-

@@ -29,79 +29,36 @@ class FileTypeManager:
 
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-
-        # Maps file extensions to their corresponding extractor class
         self._extractors: Dict[str, Type[BaseExtractor]] = {}
+        self._register_extractors()
 
-        # Register all available extractors during initialization
-        self._register_available_extractors()
-
-    def _register_available_extractors(self):
-        """
-        Register all available extractors based on installed dependencies.
-
-        Attempts to import each extractor type and registers it if dependencies
-        are available. Continues silently if dependencies are missing.
-        """
+    def _register_extractors(self):
+        """Register available extractors."""
         registered = []
 
-        # PDF extractor registration
-        try:
-            from src.extractors.pdf_extractor import PDFTextExtractor
-            self._extractors['.pdf'] = PDFTextExtractor
-            registered.append('.pdf')
-        except ImportError:
-            self.logger.debug("PDF extractor not available - required dependencies may be missing")
+        # Try to register each extractor
+        EXTRACTORS = [
+            ('.pdf', 'src.extractors.pdf_extractor', 'PDFTextExtractor'),
+            ('.docx', 'src.extractors.docx_extractor', 'DocxExtractor'),
+            ('.csv', 'src.extractors.csv_extractor', 'CSVTextExtractor'),
+            ('.xlsx', 'src.extractors.xlsx_extractor', 'XLSXTextExtractor'),
+            ('.xlsm', 'src.extractors.xlsx_extractor', 'XLSXTextExtractor'),
+            ('.xls', 'src.extractors.xlsx_extractor', 'XLSXTextExtractor'),
+        ]
 
-        # DOCX extractor registration
-        try:
-            from src.extractors.docx_extractor import DocxExtractor
-            self._extractors['.docx'] = DocxExtractor
-            registered.append('.docx')
-        except ImportError:
-            self.logger.debug("DOCX extractor not available - required dependencies may be missing")
-
-        # CSV extractor registration
-        try:
-            from src.extractors.csv_extractor import CSVTextExtractor
-            self._extractors['.csv'] = CSVTextExtractor
-            registered.append('.csv')
-        except ImportError:
-            self.logger.debug("CSV extractor not available - required dependencies may be missing")
-
-        # XLSX extractor registration
-        try:
-            from src.extractors.xlsx_extractor import XLSXTextExtractor
-            self._extractors['.xlsx'] = XLSXTextExtractor
-            self._extractors['.xlsm'] = XLSXTextExtractor
-            self._extractors['.xls'] = XLSXTextExtractor   # Legacy Excel format
-
-            registered.append('.xlsx/.xlsm/.xls')
-        except ImportError:
-            self.logger.debug("Excel extractor not available - required dependencies may be missing")
+        for extension, module_name, class_name in EXTRACTORS:
+            try:
+                module = __import__(module_name, fromlist=[class_name])
+                extractor_class = getattr(module, class_name)
+                self._extractors[extension] = extractor_class
+                registered.append(extension)
+            except ImportError:
+                self.logger.debug(f"Extractor for {extension} not available")
 
         if registered:
-            self.logger.info(f"✅ Registered extractors: {', '.join(registered)}")
+            self.logger.info(f"Available: {', '.join(registered)}")
         else:
-            self.logger.warning("⚠️  No extractors available - check dependencies installation")
-
-    def register_extractor(self, extension: str, extractor_class: Type[BaseExtractor]):
-        """
-        Register custom extractor for a file extension.
-
-        Args:
-            extension: File extension (e.g., '.pdf', '.txt')
-            extractor_class: Class that inherits from BaseExtractor
-
-        Raises:
-            ValueError: If extractor_class doesn't inherit from BaseExtractor
-        """
-        if not issubclass(extractor_class, BaseExtractor):
-            raise ValueError(f"{extractor_class.__name__} must inherit from BaseExtractor")
-
-        extension = extension.lower()
-        self._extractors[extension] = extractor_class
-        self.logger.info(f"Registered {extractor_class.__name__} for {extension}")
+            self.logger.warning("No extractors available")
 
     def _create_extractor(self, file_path: Path) -> Optional[BaseExtractor]:
         """
@@ -122,78 +79,8 @@ class FileTypeManager:
         try:
             return extractor_class()
         except Exception as e:
-            self.logger.error(f"❌ Error creating {extractor_class.__name__}: {e}")
+            self.logger.error(f"Error creating {extractor_class.__name__}: {e}")
             return None
-
-    def process_file(self, input_path: Union[str, Path], output_dir: Union[str, Path],
-                     preserve_structure: bool = True) -> bool:
-        """
-        Process document file and save extraction result.
-
-        Args:
-            input_path: Path to input document
-            output_dir: Directory for output JSON file
-
-        Returns:
-            bool: True if processing succeeded, False otherwise
-        """
-        input_path = Path(input_path)
-
-        # Validate file existence
-        if not input_path.exists():
-            self.logger.error(f"File not found: {input_path}")
-            return False
-
-        try:
-            # Create appropriate extractor based on file extension
-            extractor = self._create_extractor(input_path)
-
-            if extractor is None:
-                self.logger.warning(
-                    f"Unsupported file type: '{input_path.suffix}'. "
-                    f"File ignored: '{input_path.name}'"
-                )
-                return False
-
-            self.logger.info(f"Processing '{input_path.name}' with '{extractor.__class__.__name__}'")
-
-            # CORREÇÃO: Determinar output_path baseado na estrutura
-            if preserve_structure:
-                # Tentar preservar estrutura de pastas
-                # Assumir que input_path tem formato: .../raw/DOMAIN/CATEGORY/file.ext
-                parts = input_path.parts
-
-                # Procurar por 'raw' nas partes do caminho
-                raw_index = None
-                for i, part in enumerate(parts):
-                    if part == 'raw':
-                        raw_index = i
-                        break
-
-                if raw_index is not None and len(parts) > raw_index + 3:
-                    # Extrair domain/category da estrutura
-                    domain = parts[raw_index + 1]
-                    category = parts[raw_index + 2]
-
-                    # Criar estrutura de output preservando hierarquia
-                    output_subdir = Path(output_dir) / domain / category
-                    output_subdir.mkdir(parents=True, exist_ok=True)
-                    output_path = output_subdir / (input_path.stem + '.json')
-
-                    self.logger.info(f"Preserving structure: {domain}/{category}")
-                else:
-                    # Fallback: salvar na raiz
-                    output_path = Path(output_dir) / (input_path.stem + '.json')
-                    self.logger.warning(f"Could not detect folder structure, saving to root")
-            else:
-                # Estrutura simples - salvar na raiz do output_dir
-                output_path = Path(output_dir) / (input_path.stem + '.json')
-
-            return extractor.extract_and_save(input_path, output_path)
-
-        except Exception as e:
-            self.logger.error(f"Unexpected error processing '{input_path.name}': {e}")
-            return False
 
     def get_supported_extensions(self) -> list:
         """
